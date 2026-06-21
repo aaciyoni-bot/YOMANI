@@ -1,4 +1,5 @@
-lang="he" dir="rtl">
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,16 +11,8 @@ lang="he" dir="rtl">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- React & ReactDOM (Production versions for stability) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel (for compiling JSX in the browser) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Firebase (Compat versions for simple HTML integration) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Babel (Reliable CDNJS version) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&display=swap');
@@ -27,15 +20,13 @@ lang="he" dir="rtl">
             font-family: 'Heebo', sans-serif;
             background-color: #f8fafc;
             margin: 0;
-            overflow: hidden; /* Prevent body scroll, let inner containers scroll */
+            overflow: hidden;
         }
-        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Modal Animation */
         .modal-enter {
             animation: fadeIn 0.2s ease-out forwards;
         }
@@ -49,37 +40,37 @@ lang="he" dir="rtl">
     <div id="root">
         <div style="display: flex; height: 100vh; width: 100vw; align-items: center; justify-content: center; background-color: #f8fafc; flex-direction: column;">
             <i class="fas fa-circle-notch fa-spin text-blue-500 text-4xl mb-4"></i>
-            <h2 class="text-xl font-bold text-slate-700 font-sans">טוען מערכת חכמה...</h2>
-            <p class="text-slate-500 mt-2 font-sans">מעבד נתונים, אנא המתן.</p>
+            <h2 class="text-xl font-bold text-slate-700 font-sans" id="loading-text">טוען מערכת חכמה...</h2>
+            <p class="text-slate-500 mt-2 font-sans">מעבד נתונים ומתחבר לענן, אנא המתן.</p>
         </div>
     </div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect } from "https://esm.sh/react@18.2.0";
+        import { createRoot } from "https://esm.sh/react-dom@18.2.0/client";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyCVEQHiEk0WEzhnmpFYQ4M9hkrIykYSr8E",
-            authDomain: "yoman-92dee.firebaseapp.com",
-            projectId: "yoman-92dee",
-            storageBucket: "yoman-92dee.firebasestorage.app",
-            messagingSenderId: "1080774869066",
-            appId: "1:1080774869066:web:9eb2c274e3dd821e20e6b3",
-            measurementId: "G-TBY4DXNV91"
-        };
-
-        // Initialize Firebase safely
-        let db = null;
+        // Firebase Configuration dynamically loaded from environment
+        let firebaseConfig = null;
         try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
             }
-            db = firebase.firestore();
-        } catch (error) {
-            console.error("שגיאה בהתחברות ל-Firebase:", error);
+        } catch (e) {
+            console.error("Error parsing firebase config", e);
         }
 
-        // --- Error Boundary to prevent blank white screens ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        let app, auth, db;
+        if (firebaseConfig) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        }
+
         class ErrorBoundary extends React.Component {
             constructor(props) {
                 super(props);
@@ -97,8 +88,8 @@ lang="he" dir="rtl">
                         <div className="min-h-screen bg-red-50 flex items-center justify-center p-4" dir="rtl">
                             <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-200 max-w-lg w-full">
                                 <div className="text-red-500 mb-4"><i className="fas fa-exclamation-triangle text-5xl"></i></div>
-                                <h1 className="text-2xl font-bold text-slate-800 mb-2">אופס, משהו השתבש!</h1>
-                                <p className="text-slate-600 mb-4">המערכת נתקלה בשגיאה בלתי צפויה. הנה פרטי השגיאה כדי שנוכל לתקן אותה:</p>
+                                <h1 className="text-2xl font-bold text-slate-800 mb-2">אופס, שגיאת תצוגה!</h1>
+                                <p className="text-slate-600 mb-4">המערכת נתקלה בשגיאה בעת ניסיון להציג את התוכן.</p>
                                 <div className="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-sm overflow-x-auto text-left" dir="ltr">
                                     {this.state.error?.toString()}
                                 </div>
@@ -113,7 +104,6 @@ lang="he" dir="rtl">
             }
         }
 
-        // Initial Projects Template
         const INITIAL_PROJECTS = [
             { id: '1', name: 'TOURIZIS אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
             { id: '2', name: 'כרטיסי גירוד - קמפיין תרומות', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
@@ -129,13 +119,18 @@ lang="he" dir="rtl">
             { id: '12', name: 'COLLEXEN אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
         ];
 
+        const FALLBACK_USERS = {
+            'ADMIN1': { password: 'ADMIN111', role: 'superadmin' },
+            'ADMIN2': { password: 'ADMIN', role: 'user' }
+        };
+
         function App() {
-            // Main State
+            const [dbUser, setDbUser] = useState(null);
+            
             const [projects, setProjects] = useState([]);
             const [activeProjectId, setActiveProjectId] = useState(null);
             const [searchTerm, setSearchTerm] = useState('');
             
-            // User & Auth State
             const [loggedInUser, setLoggedInUser] = useState(null);
             const [loggedInRole, setLoggedInRole] = useState(null);
             const [systemUsers, setSystemUsers] = useState({});
@@ -143,54 +138,80 @@ lang="he" dir="rtl">
             const [passwordInput, setPasswordInput] = useState('');
             const [loginError, setLoginError] = useState('');
 
-            // Modals State
             const [projectToDelete, setProjectToDelete] = useState(null);
             const [deleteRequestModalProject, setDeleteRequestModalProject] = useState(null);
             const [showUserModal, setShowUserModal] = useState(false);
             
-            // New User Form State
             const [newUserName, setNewUserName] = useState('');
             const [newUserPass, setNewUserPass] = useState('');
 
+            // Initialize Firebase Auth (Rule 3)
             useEffect(() => {
-                if (!db) return;
-                
-                const unsubscribe = db.collection("users").onSnapshot((snapshot) => {
-                    if (snapshot.empty) {
-                        // Initialize default users securely in DB
-                        const initialUsers = {
-                            'ADMIN1': { password: 'ADMIN111', role: 'superadmin' },
-                            'ADMIN2': { password: 'ADMIN', role: 'user' }
-                        };
-                        Object.entries(initialUsers).forEach(([username, data]) => {
-                            db.collection("users").doc(username).set(data);
-                        });
-                        setSystemUsers(initialUsers);
-                    } else {
-                        const usersMap = {};
-                        snapshot.forEach(doc => {
-                            usersMap[doc.id] = doc.data();
-                        });
-                        setSystemUsers(usersMap);
+                if (!auth) return;
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Authentication failed:", error);
                     }
-                }, (error) => {
-                    console.error("Error fetching users:", error);
+                };
+                initAuth();
+                
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    setDbUser(user);
                 });
                 return () => unsubscribe();
             }, []);
 
+            // Fetch System Users (Rule 1 & Rule 3)
             useEffect(() => {
-                if (!loggedInUser || !db) return;
+                if (!dbUser || !db) {
+                    setSystemUsers(FALLBACK_USERS);
+                    return;
+                }
+                
+                const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'systemUsers');
+                const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+                    if (snapshot.empty) {
+                        Object.entries(FALLBACK_USERS).forEach(([username, data]) => {
+                            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'systemUsers', username), data).catch(console.error);
+                        });
+                        setSystemUsers(FALLBACK_USERS);
+                    } else {
+                        const usersMap = {};
+                        snapshot.forEach(d => {
+                            usersMap[d.id] = d.data();
+                        });
+                        setSystemUsers(usersMap);
+                    }
+                }, (error) => {
+                    console.warn("Users sync error:", error);
+                    setSystemUsers(FALLBACK_USERS);
+                });
+                return () => unsubscribe();
+            }, [dbUser]);
 
-                const unsubscribe = db.collection("projects").onSnapshot((snapshot) => {
+            // Fetch Projects (Rule 1 & Rule 3)
+            useEffect(() => {
+                if (!dbUser || !loggedInUser || !db) {
+                    setProjects(INITIAL_PROJECTS);
+                    return;
+                }
+
+                const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
+                const unsubscribe = onSnapshot(projectsRef, (snapshot) => {
                     const dbProjects = [];
-                    snapshot.forEach((doc) => {
-                        dbProjects.push({ id: doc.id, ...doc.data() });
+                    snapshot.forEach((d) => {
+                        dbProjects.push({ id: d.id, ...d.data() });
                     });
 
                     if (dbProjects.length === 0) {
                         INITIAL_PROJECTS.forEach(proj => {
-                            db.collection("projects").doc(proj.id).set(proj);
+                            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id), proj).catch(console.error);
                         });
                         setProjects(INITIAL_PROJECTS);
                     } else {
@@ -198,18 +219,16 @@ lang="he" dir="rtl">
                         setProjects(dbProjects);
                     }
                 }, (error) => {
-                     console.error("Error fetching projects:", error);
+                     console.warn("Projects sync error:", error);
+                     setProjects(INITIAL_PROJECTS);
                 });
 
                 return () => unsubscribe();
-            }, [loggedInUser]);
+            }, [dbUser, loggedInUser]);
 
-            const updateCloud = (updatedProjects) => {
-                if(!db) return;
-                setProjects(updatedProjects);
-                updatedProjects.forEach(proj => {
-                    db.collection("projects").doc(proj.id).set(proj);
-                });
+            const saveProjectToCloud = (proj) => {
+                if (!dbUser || !db) return;
+                setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id), proj).catch(console.error);
             };
 
             const addLog = (projectId, actionDescription) => {
@@ -263,19 +282,19 @@ lang="he" dir="rtl">
 
             const handleAddUser = (e) => {
                 e.preventDefault();
-                if(!newUserName.trim() || !newUserPass.trim() || !db) return;
+                if(!newUserName.trim() || !newUserPass.trim() || !dbUser || !db) return;
                 const uname = newUserName.trim().toUpperCase();
-                db.collection("users").doc(uname).set({
+                setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'systemUsers', uname), {
                     password: newUserPass.trim(),
                     role: 'user'
-                });
+                }).catch(console.error);
                 setNewUserName('');
                 setNewUserPass('');
             };
 
             const deleteUser = (uname) => {
-                if(uname === 'ADMIN1' || !db) return; // Protect superadmin
-                db.collection("users").doc(uname).delete();
+                if(uname === 'ADMIN1' || !dbUser || !db) return;
+                deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'systemUsers', uname)).catch(console.error);
             };
 
             const createNewProject = () => {
@@ -288,12 +307,13 @@ lang="he" dir="rtl">
                     tasks: [],
                     codeSnippet: '',
                     logs: [addLog(Date.now().toString(), 'יצר פרויקט חדש')],
-                    allowedUsers: Array.from(new Set(['ADMIN1', loggedInUser])), // Default access
+                    allowedUsers: Array.from(new Set(['ADMIN1', loggedInUser])),
                     deleteRequested: false,
                     deleteRequestedBy: ''
                 };
-                const updatedProjects = [newProject, ...projects];
-                updateCloud(updatedProjects);
+                
+                setProjects([newProject, ...projects]);
+                saveProjectToCloud(newProject);
                 setActiveProjectId(newProject.id);
             };
 
@@ -306,12 +326,13 @@ lang="he" dir="rtl">
                 if (field === 'description') actionDesc = `עדכן תיאור פרויקט`;
                 if (field === 'allowedUsers') actionDesc = `שינה הרשאות צפייה לפרויקט`;
 
-                updateCloud(projects.map(p => {
+                setProjects(projects.map(p => {
                     if (p.id === id) {
                         const updatedProject = { ...p, [field]: value };
                         if (actionDesc) {
                            updatedProject.logs = [addLog(id, actionDesc), ...(p.logs || [])].slice(0, 50);
                         }
+                        saveProjectToCloud(updatedProject);
                         return updatedProject;
                     }
                     return p;
@@ -328,8 +349,8 @@ lang="he" dir="rtl">
             };
 
             const executeDeleteProject = () => {
-                if (projectToDelete && db) {
-                    db.collection("projects").doc(projectToDelete.id).delete();
+                if (projectToDelete && dbUser && db) {
+                    deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', projectToDelete.id)).catch(console.error);
                     if (activeProjectId === projectToDelete.id) {
                         setActiveProjectId(null);
                     }
@@ -339,10 +360,11 @@ lang="he" dir="rtl">
 
             const requestDeleteProject = () => {
                 if (deleteRequestModalProject) {
-                    updateCloud(projects.map(p => {
+                    setProjects(projects.map(p => {
                         if (p.id === deleteRequestModalProject.id) {
                             const updatedProject = { ...p, deleteRequested: true, deleteRequestedBy: loggedInUser };
                             updatedProject.logs = [addLog(p.id, `ביקש אישור מחיקה לפרויקט`), ...(p.logs || [])].slice(0, 50);
+                            saveProjectToCloud(updatedProject);
                             return updatedProject;
                         }
                         return p;
@@ -352,17 +374,18 @@ lang="he" dir="rtl">
             };
 
             const approveDeleteProject = (project) => {
-                if(!db || !project) return;
-                db.collection("projects").doc(project.id).delete();
+                if(!dbUser || !db || !project) return;
+                deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', project.id)).catch(console.error);
                 if (activeProjectId === project.id) setActiveProjectId(null);
             };
 
             const rejectDeleteProject = (project) => {
                 if(!project) return;
-                updateCloud(projects.map(p => {
+                setProjects(projects.map(p => {
                     if (p.id === project.id) {
                         const updatedProject = { ...p, deleteRequested: false, deleteRequestedBy: '' };
                         updatedProject.logs = [addLog(p.id, `ADMIN1 דחה את בקשת המחיקה`), ...(p.logs || [])].slice(0, 50);
+                        saveProjectToCloud(updatedProject);
                         return updatedProject;
                     }
                     return p;
@@ -379,11 +402,12 @@ lang="he" dir="rtl">
                     category: category || 'general'
                 };
                 
-                updateCloud(projects.map(p => {
+                setProjects(projects.map(p => {
                     if (p.id === projectId) {
                         const tasks = Array.isArray(p.tasks) ? p.tasks : [];
                         const updatedProject = { ...p, tasks: [...tasks, newTask] };
                         updatedProject.logs = [addLog(projectId, `הוסיף משימה: "${taskText}"`), ...(p.logs || [])].slice(0, 50);
+                        saveProjectToCloud(updatedProject);
                         return updatedProject;
                     }
                     return p;
@@ -391,7 +415,7 @@ lang="he" dir="rtl">
             };
 
             const toggleTask = (projectId, taskId) => {
-                updateCloud(projects.map(p => {
+                setProjects(projects.map(p => {
                     if (p.id === projectId) {
                         const tasks = Array.isArray(p.tasks) ? p.tasks : [];
                         const task = tasks.find(t => t.id === taskId);
@@ -404,6 +428,7 @@ lang="he" dir="rtl">
                             tasks: tasks.map(t => t.id === taskId ? { ...t, isDone: newState } : t)
                         };
                         updatedProject.logs = [addLog(projectId, actionDesc), ...(p.logs || [])].slice(0, 50);
+                        saveProjectToCloud(updatedProject);
                         return updatedProject;
                     }
                     return p;
@@ -411,12 +436,13 @@ lang="he" dir="rtl">
             };
 
             const deleteTask = (projectId, taskId) => {
-                updateCloud(projects.map(p => {
+                setProjects(projects.map(p => {
                     if (p.id === projectId) {
                         const tasks = Array.isArray(p.tasks) ? p.tasks : [];
                         const task = tasks.find(t => t.id === taskId);
                         const updatedProject = { ...p, tasks: tasks.filter(t => t.id !== taskId) };
                         updatedProject.logs = [addLog(projectId, `מחק משימה: "${task?.text || ''}"`), ...(p.logs || [])].slice(0, 50);
+                        saveProjectToCloud(updatedProject);
                         return updatedProject;
                     }
                     return p;
@@ -515,8 +541,6 @@ lang="he" dir="rtl">
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
                     
-                    {}
-                    {/* User Management Modal */}
                     {showUserModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-50 backdrop-blur-sm">
                             <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full mx-4 modal-enter border border-slate-100">
@@ -548,7 +572,7 @@ lang="he" dir="rtl">
                                                 <div>
                                                     <div className="font-bold text-slate-700 text-sm">{uname}</div>
                                                     <div className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">
-                                                        {data.role === 'superadmin' ? 'מנהל ראשי (הרשאת על)' : 'משתמש רגיל'}
+                                                        {data.role === 'superadmin' ? 'מנהל ראשי' : 'משתמש רגיל'}
                                                     </div>
                                                 </div>
                                             </div>
@@ -564,14 +588,13 @@ lang="he" dir="rtl">
                         </div>
                     )}
 
-                    {/* Delete Admin Modal */}
                     {projectToDelete && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-50 backdrop-blur-sm">
                             <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 modal-enter border border-slate-100">
                                 <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
                                     <i className="fas fa-exclamation-triangle text-2xl text-red-600"></i>
                                 </div>
-                                <h3 className="text-xl font-bold text-center text-slate-800 mb-2">מחיקת פרויקט (ADMIN)</h3>
+                                <h3 className="text-xl font-bold text-center text-slate-800 mb-2">מחיקת פרויקט</h3>
                                 <p className="text-center text-slate-500 mb-6">האם למחוק את <strong>"{projectToDelete.name}"</strong>? הפעולה הזו בלתי הפיכה.</p>
                                 <div className="flex gap-3">
                                     <button onClick={() => setProjectToDelete(null)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl">ביטול</button>
@@ -581,7 +604,6 @@ lang="he" dir="rtl">
                         </div>
                     )}
 
-                    {/* Delete Request Modal (For Normal Users) */}
                     {deleteRequestModalProject && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-50 backdrop-blur-sm">
                             <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 modal-enter border border-slate-100">
@@ -590,17 +612,16 @@ lang="he" dir="rtl">
                                 </div>
                                 <h3 className="text-xl font-bold text-center text-slate-800 mb-2">בקשת מחיקה</h3>
                                 <p className="text-center text-slate-500 mb-6 text-sm">
-                                    אין לך הרשאה למחוק את <strong>"{deleteRequestModalProject.name}"</strong>. האם תרצה לשלוח בקשת אישור מחיקה ל-ADMIN1?
+                                    אין לך הרשאה למחוק את <strong>"{deleteRequestModalProject.name}"</strong>. האם תרצה לשלוח בקשת מחיקה למנהל?
                                 </p>
                                 <div className="flex gap-3">
                                     <button onClick={() => setDeleteRequestModalProject(null)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm">ביטול</button>
-                                    <button onClick={requestDeleteProject} className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm">שלח בקשת אישור</button>
+                                    <button onClick={requestDeleteProject} className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm">שלח בקשה</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {}
                     <div className="w-[350px] bg-white border-l border-slate-200 flex flex-col shadow-sm z-10 flex-shrink-0">
                         <div className="p-4 border-b border-slate-200 bg-white">
                             <div className="flex items-center justify-between mb-4">
@@ -618,7 +639,7 @@ lang="he" dir="rtl">
                                     <i className={`fas fa-user-circle text-base ${loggedInRole === 'superadmin' ? 'text-purple-500' : 'text-blue-500'}`}></i>
                                     <span>מחובר: <strong>{loggedInUser}</strong></span>
                                 </div>
-                                <div className="flex items-center gap-1 text-emerald-600" title="מסונכרן לענן">
+                                <div className="flex items-center gap-1 text-emerald-600">
                                     <i className="fas fa-cloud"></i>
                                 </div>
                             </div>
@@ -635,10 +656,10 @@ lang="he" dir="rtl">
                             </div>
 
                             <button onClick={createNewProject} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm">
-                                <i className="fas fa-plus"></i> פרויקט / תיקייה חדשה
+                                <i className="fas fa-plus"></i> פרויקט חדש
                             </button>
 
-                            <input type="text" placeholder="חיפוש פרויקט..." className="w-full mt-3 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
+                            <input type="text" placeholder="חיפוש..." className="w-full mt-3 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-2">
@@ -663,7 +684,7 @@ lang="he" dir="rtl">
                                         >
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="font-semibold text-slate-800">{project.name || 'ללא שם'}</div>
-                                                {project.deleteRequested && <i className="fas fa-exclamation-triangle text-amber-500 text-xs" title="בקשת מחיקה ממתינה"></i>}
+                                                {project.deleteRequested && <i className="fas fa-exclamation-triangle text-amber-500 text-xs"></i>}
                                             </div>
                                             
                                             <div className="flex gap-2 mb-2 text-xs flex-wrap">
@@ -672,7 +693,7 @@ lang="he" dir="rtl">
                                             </div>
                                             
                                             <div className="flex justify-between items-center mt-3 text-[10px] font-bold">
-                                                <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">{metrics.open} משימות פתוחות</span>
+                                                <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">{metrics.open} פתוחות</span>
                                                 {metrics.overdue > 0 && <span className="bg-red-50 text-red-600 px-2 py-1 rounded-md border border-red-200"><i className="fas fa-fire mr-1"></i> {metrics.overdue} באיחור!</span>}
                                             </div>
                                             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2 overflow-hidden">
@@ -685,17 +706,15 @@ lang="he" dir="rtl">
                         </div>
                     </div>
 
-                    {}
                     <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
                         {activeProjectId && activeProject ? (
                             <div className="flex-1 overflow-y-auto p-6 md:p-8">
                                 
-                                {/* Delete Approval Banner for ADMIN1 */}
                                 {activeProject.deleteRequested && (
                                     <div className="bg-amber-100 border border-amber-300 p-4 rounded-xl mb-6 flex justify-between items-center shadow-sm">
                                         <div>
                                             <h4 className="font-bold text-amber-900 flex items-center gap-2"><i className="fas fa-shield-alt text-amber-600"></i> מחיקת פרויקט ממתינה לאישור</h4>
-                                            <p className="text-sm text-amber-800 mt-1">משתמש <strong>{activeProject.deleteRequestedBy}</strong> ביקש למחוק את הפרויקט הזה.</p>
+                                            <p className="text-sm text-amber-800 mt-1">משתמש <strong>{activeProject.deleteRequestedBy}</strong> ביקש למחוק את הפרויקט.</p>
                                         </div>
                                         {(loggedInUser === 'ADMIN1' || loggedInRole === 'superadmin') ? (
                                             <div className="flex gap-2">
@@ -703,12 +722,11 @@ lang="he" dir="rtl">
                                                 <button onClick={() => approveDeleteProject(activeProject)} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-700 shadow-md">אשר ומחק סופית</button>
                                             </div>
                                         ) : (
-                                            <span className="text-xs font-bold text-amber-700 bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300"><i className="fas fa-clock mr-1"></i> ממתין לאישור מנהל ראשי</span>
+                                            <span className="text-xs font-bold text-amber-700 bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300">ממתין למנהל ראשי</span>
                                         )}
                                     </div>
                                 )}
 
-                                {/* Project Header Controls */}
                                 <div className="mb-6 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
@@ -717,7 +735,7 @@ lang="he" dir="rtl">
                                                 value={activeProject.name || ''}
                                                 onChange={(e) => updateProject(activeProject.id, 'name', e.target.value)}
                                                 className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 w-full mb-3 placeholder-slate-300"
-                                                placeholder="שם הפרויקט או התיקייה..."
+                                                placeholder="שם הפרויקט..."
                                             />
                                             
                                             <div className="flex gap-4">
@@ -747,19 +765,18 @@ lang="he" dir="rtl">
                                                 </div>
                                             </div>
                                         </div>
-                                        <button onClick={() => confirmDeleteProject(activeProject)} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-xl transition-colors border border-transparent hover:border-red-100" title="מחק פרויקט">
+                                        <button onClick={() => confirmDeleteProject(activeProject)} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-xl transition-colors border border-transparent hover:border-red-100">
                                             <i className="fas fa-trash-alt text-xl"></i>
                                         </button>
                                     </div>
                                     
-                                    {/* Access Control section visible only to Superadmins */}
                                     {(loggedInUser === 'ADMIN1' || loggedInRole === 'superadmin') && (
                                         <div className="mt-5 pt-4 border-t border-slate-100">
                                             <h4 className="text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wide flex items-center gap-1"><i className="fas fa-eye"></i> מי יכול לראות פרויקט זה?</h4>
                                             <div className="flex flex-wrap gap-2">
                                                 {Object.keys(systemUsers).map(uname => {
                                                     const isAllowed = activeProject.allowedUsers ? activeProject.allowedUsers.includes(uname) : true;
-                                                    if(uname === 'ADMIN1') return <span key={uname} className="text-xs bg-slate-100 text-slate-400 px-2 py-1 rounded-md font-bold cursor-not-allowed border border-slate-200" title="מנהל רואה תמיד הכל">ADMIN1 (קבוע)</span>;
+                                                    if(uname === 'ADMIN1') return <span key={uname} className="text-xs bg-slate-100 text-slate-400 px-2 py-1 rounded-md font-bold border border-slate-200">ADMIN1 (קבוע)</span>;
                                                     
                                                     return (
                                                         <button 
@@ -785,20 +802,19 @@ lang="he" dir="rtl">
                                     )}
                                 </div>
 
-                                {}
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-10">
                                     <div className="lg:col-span-7 flex flex-col gap-6">
                                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                                             <h3 className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2">
-                                                <i className="fas fa-align-left text-blue-500"></i> הערות כלליות / תקציר
+                                                <i className="fas fa-align-left text-blue-500"></i> הערות כלליות
                                             </h3>
-                                            <textarea value={activeProject.description || ''} onChange={(e) => updateProject(activeProject.id, 'description', e.target.value)} className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 text-sm" placeholder="הקלק כאן כדי להוסיף הערות כלליות..."/>
+                                            <textarea value={activeProject.description || ''} onChange={(e) => updateProject(activeProject.id, 'description', e.target.value)} className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 text-sm" placeholder="הקלק כאן כדי להוסיף הערות..."></textarea>
                                         </div>
 
                                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col">
                                             <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                                                 <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                                                    <i className="fas fa-check-circle text-blue-500"></i> משימות ופעולות
+                                                    <i className="fas fa-check-circle text-blue-500"></i> משימות
                                                 </h3>
                                                 <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">{getTaskMetrics(activeProject.tasks).progress}% הושלם</span>
                                             </div>
@@ -851,7 +867,7 @@ lang="he" dir="rtl">
                                     <div className="lg:col-span-5 flex flex-col gap-6">
                                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-64 flex flex-col">
                                             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
-                                                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2"><i className="fas fa-history text-blue-500"></i> יומן פעולות ומעקב</h3>
+                                                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2"><i className="fas fa-history text-blue-500"></i> יומן פעולות</h3>
                                             </div>
                                             <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                                 {activeProject.logs && activeProject.logs.length > 0 ? (
@@ -870,9 +886,9 @@ lang="he" dir="rtl">
 
                                         <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 flex flex-col flex-1 min-h-[300px]">
                                             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-                                                <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2"><i className="fas fa-code text-blue-400"></i> כספת קוד / קישורים</h3>
+                                                <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2"><i className="fas fa-code text-blue-400"></i> כספת קוד</h3>
                                             </div>
-                                            <textarea value={activeProject.codeSnippet || ''} onChange={(e) => updateProject(activeProject.id, 'codeSnippet', e.target.value)} className="flex-1 w-full p-4 bg-slate-900 text-green-400 font-mono text-sm resize-none focus:outline-none rounded-b-2xl leading-relaxed" placeholder="// הדבק כאן קוד או קישורים..." dir="ltr" />
+                                            <textarea value={activeProject.codeSnippet || ''} onChange={(e) => updateProject(activeProject.id, 'codeSnippet', e.target.value)} className="flex-1 w-full p-4 bg-slate-900 text-green-400 font-mono text-sm resize-none focus:outline-none rounded-b-2xl leading-relaxed" placeholder="// הדבק כאן קוד..." dir="ltr"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -883,13 +899,13 @@ lang="he" dir="rtl">
                                     <div className="flex items-center gap-4 mb-8">
                                         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-4 rounded-2xl shadow-lg text-white"><i className="fas fa-chart-line text-3xl"></i></div>
                                         <div>
-                                            <h2 className="text-2xl font-bold text-slate-800">לוח משימות חכם גלובלי</h2>
-                                            <p className="text-slate-500 font-medium">ברוך הבא {loggedInUser}! הנה ריכוז המשימות הפתוחות מהפרויקטים המורשים לך.</p>
+                                            <h2 className="text-2xl font-bold text-slate-800">לוח משימות גלובלי</h2>
+                                            <p className="text-slate-500 font-medium">המשימות הפתוחות מהפרויקטים שלך.</p>
                                         </div>
                                     </div>
 
                                     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8">
-                                        <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4"><i className="fas fa-check-circle text-blue-500"></i> משימות דחופות ופתוחות</h3>
+                                        <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4"><i className="fas fa-check-circle text-blue-500"></i> לביצוע</h3>
                                         
                                         <div className="space-y-3">
                                             {visibleProjects.flatMap(p => (Array.isArray(p?.tasks) ? p.tasks : []).filter(t => !t.isDone).map(t => ({...t, projectName: p.name, projectId: p.id})))
@@ -918,7 +934,7 @@ lang="he" dir="rtl">
                                             {visibleProjects.flatMap(p => (Array.isArray(p?.tasks) ? p.tasks : []).filter(t => !t.isDone)).length === 0 && (
                                                 <div className="text-center py-10 text-slate-500">
                                                     <i className="fas fa-glass-cheers text-4xl mb-4 text-emerald-400"></i>
-                                                    <p className="font-medium text-lg">איזה יופי! אין לך משימות פתוחות בכלל.</p>
+                                                    <p className="font-medium text-lg">אין לך משימות פתוחות בכלל.</p>
                                                 </div>
                                             )}
                                         </div>
@@ -931,7 +947,7 @@ lang="he" dir="rtl">
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        const root = createRoot(document.getElementById('root'));
         root.render(
             <ErrorBoundary>
                 <App />
