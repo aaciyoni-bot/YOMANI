@@ -1,3 +1,4 @@
+
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -10,7 +11,7 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- React & ReactDOM -->
+    <!-- React & ReactDOM (Production versions for stability) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
@@ -46,7 +47,13 @@
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="display: flex; height: 100vh; width: 100vw; align-items: center; justify-content: center; background-color: #f8fafc; flex-direction: column;">
+            <i class="fas fa-circle-notch fa-spin text-blue-500 text-4xl mb-4"></i>
+            <h2 class="text-xl font-bold text-slate-700 font-sans">טוען מערכת חכמה...</h2>
+            <p class="text-slate-500 mt-2 font-sans">מעבד נתונים, אנא המתן.</p>
+        </div>
+    </div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
@@ -62,11 +69,50 @@
             measurementId: "G-TBY4DXNV91"
         };
 
-        // Initialize Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
+        // Initialize Firebase safely
+        let db = null;
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+        } catch (error) {
+            console.error("שגיאה בהתחברות ל-Firebase:", error);
         }
-        const db = firebase.firestore();
+
+        // --- Error Boundary to prevent blank white screens ---
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            componentDidCatch(error, errorInfo) {
+                console.error("React Error Caught:", error, errorInfo);
+            }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen bg-red-50 flex items-center justify-center p-4" dir="rtl">
+                            <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-200 max-w-lg w-full">
+                                <div className="text-red-500 mb-4"><i className="fas fa-exclamation-triangle text-5xl"></i></div>
+                                <h1 className="text-2xl font-bold text-slate-800 mb-2">אופס, משהו השתבש!</h1>
+                                <p className="text-slate-600 mb-4">המערכת נתקלה בשגיאה בלתי צפויה. הנה פרטי השגיאה כדי שנוכל לתקן אותה:</p>
+                                <div className="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-sm overflow-x-auto text-left" dir="ltr">
+                                    {this.state.error?.toString()}
+                                </div>
+                                <button onClick={() => window.location.reload()} className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors w-full">
+                                    רענן עמוד ונסה שוב
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
 
         // Initial Projects Template
         const INITIAL_PROJECTS = [
@@ -85,6 +131,7 @@
         ];
 
         function App() {
+            // Main State
             const [projects, setProjects] = useState([]);
             const [activeProjectId, setActiveProjectId] = useState(null);
             const [searchTerm, setSearchTerm] = useState('');
@@ -107,6 +154,8 @@
             const [newUserPass, setNewUserPass] = useState('');
 
             useEffect(() => {
+                if (!db) return;
+                
                 const unsubscribe = db.collection("users").onSnapshot((snapshot) => {
                     if (snapshot.empty) {
                         // Initialize default users securely in DB
@@ -132,7 +181,7 @@
             }, []);
 
             useEffect(() => {
-                if (!loggedInUser) return;
+                if (!loggedInUser || !db) return;
 
                 const unsubscribe = db.collection("projects").onSnapshot((snapshot) => {
                     const dbProjects = [];
@@ -149,12 +198,15 @@
                         dbProjects.sort((a, b) => parseInt(a.id) - parseInt(b.id));
                         setProjects(dbProjects);
                     }
+                }, (error) => {
+                     console.error("Error fetching projects:", error);
                 });
 
                 return () => unsubscribe();
             }, [loggedInUser]);
 
             const updateCloud = (updatedProjects) => {
+                if(!db) return;
                 setProjects(updatedProjects);
                 updatedProjects.forEach(proj => {
                     db.collection("projects").doc(proj.id).set(proj);
@@ -165,13 +217,14 @@
                 const timestamp = new Date().toLocaleString('he-IL');
                 return {
                     id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                    user: loggedInUser,
+                    user: loggedInUser || 'Unknown',
                     action: actionDescription,
                     time: timestamp
                 };
             };
 
             const getTaskMetrics = (tasks = []) => {
+                if (!Array.isArray(tasks)) tasks = [];
                 const total = tasks.length;
                 const done = tasks.filter(t => t.isDone).length;
                 const open = total - done;
@@ -189,7 +242,7 @@
 
             const handleLogin = (e) => {
                 e.preventDefault();
-                const userStr = usernameInput.toUpperCase();
+                const userStr = (usernameInput || '').toUpperCase().trim();
                 const userObj = systemUsers[userStr];
                 
                 if (userObj && userObj.password === passwordInput) {
@@ -211,7 +264,7 @@
 
             const handleAddUser = (e) => {
                 e.preventDefault();
-                if(!newUserName.trim() || !newUserPass.trim()) return;
+                if(!newUserName.trim() || !newUserPass.trim() || !db) return;
                 const uname = newUserName.trim().toUpperCase();
                 db.collection("users").doc(uname).set({
                     password: newUserPass.trim(),
@@ -222,7 +275,7 @@
             };
 
             const deleteUser = (uname) => {
-                if(uname === 'ADMIN1') return; // Protect superadmin
+                if(uname === 'ADMIN1' || !db) return; // Protect superadmin
                 db.collection("users").doc(uname).delete();
             };
 
@@ -267,6 +320,7 @@
             };
 
             const confirmDeleteProject = (project) => {
+                if (!project) return;
                 if (loggedInUser === 'ADMIN1' || loggedInRole === 'superadmin') {
                     setProjectToDelete(project);
                 } else {
@@ -275,7 +329,7 @@
             };
 
             const executeDeleteProject = () => {
-                if (projectToDelete) {
+                if (projectToDelete && db) {
                     db.collection("projects").doc(projectToDelete.id).delete();
                     if (activeProjectId === projectToDelete.id) {
                         setActiveProjectId(null);
@@ -299,11 +353,13 @@
             };
 
             const approveDeleteProject = (project) => {
+                if(!db || !project) return;
                 db.collection("projects").doc(project.id).delete();
                 if (activeProjectId === project.id) setActiveProjectId(null);
             };
 
             const rejectDeleteProject = (project) => {
+                if(!project) return;
                 updateCloud(projects.map(p => {
                     if (p.id === project.id) {
                         const updatedProject = { ...p, deleteRequested: false, deleteRequestedBy: '' };
@@ -315,7 +371,7 @@
             };
 
             const addTask = (projectId, taskText, dueDate, category) => {
-                if (!taskText.trim()) return;
+                if (!taskText || !taskText.trim()) return;
                 const newTask = { 
                     id: Date.now().toString() + Math.random().toString(36).substr(2, 9), 
                     text: taskText, 
@@ -326,7 +382,8 @@
                 
                 updateCloud(projects.map(p => {
                     if (p.id === projectId) {
-                        const updatedProject = { ...p, tasks: [...(p.tasks || []), newTask] };
+                        const tasks = Array.isArray(p.tasks) ? p.tasks : [];
+                        const updatedProject = { ...p, tasks: [...tasks, newTask] };
                         updatedProject.logs = [addLog(projectId, `הוסיף משימה: "${taskText}"`), ...(p.logs || [])].slice(0, 50);
                         return updatedProject;
                     }
@@ -337,14 +394,15 @@
             const toggleTask = (projectId, taskId) => {
                 updateCloud(projects.map(p => {
                     if (p.id === projectId) {
-                        const task = p.tasks.find(t => t.id === taskId);
+                        const tasks = Array.isArray(p.tasks) ? p.tasks : [];
+                        const task = tasks.find(t => t.id === taskId);
                         if (!task) return p;
                         const newState = !task.isDone;
                         const actionDesc = newState ? `סיים משימה: "${task.text}"` : `החזיר משימה לעבודה: "${task.text}"`;
                         
                         const updatedProject = {
                             ...p,
-                            tasks: p.tasks.map(t => t.id === taskId ? { ...t, isDone: newState } : t)
+                            tasks: tasks.map(t => t.id === taskId ? { ...t, isDone: newState } : t)
                         };
                         updatedProject.logs = [addLog(projectId, actionDesc), ...(p.logs || [])].slice(0, 50);
                         return updatedProject;
@@ -356,8 +414,9 @@
             const deleteTask = (projectId, taskId) => {
                 updateCloud(projects.map(p => {
                     if (p.id === projectId) {
-                        const task = p.tasks.find(t => t.id === taskId);
-                        const updatedProject = { ...p, tasks: p.tasks.filter(t => t.id !== taskId) };
+                        const tasks = Array.isArray(p.tasks) ? p.tasks : [];
+                        const task = tasks.find(t => t.id === taskId);
+                        const updatedProject = { ...p, tasks: tasks.filter(t => t.id !== taskId) };
                         updatedProject.logs = [addLog(projectId, `מחק משימה: "${task?.text || ''}"`), ...(p.logs || [])].slice(0, 50);
                         return updatedProject;
                     }
@@ -366,11 +425,13 @@
             };
 
             const visibleProjects = projects.filter(p => {
+                if (!p) return false;
                 if (loggedInUser === 'ADMIN1' || loggedInRole === 'superadmin') return true;
                 return p.allowedUsers ? p.allowedUsers.includes(loggedInUser) : true;
             });
-            const filteredProjects = visibleProjects.filter(p => p.name.includes(searchTerm));
-            const activeProject = visibleProjects.find(p => p.id === activeProjectId);
+            
+            const filteredProjects = visibleProjects.filter(p => p && p.name && p.name.includes(searchTerm));
+            const activeProject = visibleProjects.find(p => p && p.id === activeProjectId);
 
             const getPriorityColor = (priority) => {
                 switch(priority) {
@@ -455,6 +516,7 @@
             return (
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
                     
+                    {}
                     {/* User Management Modal */}
                     {showUserModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-50 backdrop-blur-sm">
@@ -539,7 +601,7 @@
                         </div>
                     )}
 
-                    {/* Sidebar */}
+                    {}
                     <div className="w-[350px] bg-white border-l border-slate-200 flex flex-col shadow-sm z-10 flex-shrink-0">
                         <div className="p-4 border-b border-slate-200 bg-white">
                             <div className="flex items-center justify-between mb-4">
@@ -588,7 +650,8 @@
                                 </div>
                             ) : (
                                 filteredProjects.map(project => {
-                                    const metrics = getTaskMetrics(project.tasks || []);
+                                    if (!project) return null;
+                                    const metrics = getTaskMetrics(project.tasks);
                                     return (
                                         <div 
                                             key={project.id}
@@ -623,6 +686,7 @@
                         </div>
                     </div>
 
+                    {}
                     <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
                         {activeProjectId && activeProject ? (
                             <div className="flex-1 overflow-y-auto p-6 md:p-8">
@@ -640,18 +704,18 @@
                                                 <button onClick={() => approveDeleteProject(activeProject)} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-700 shadow-md">אשר ומחק סופית</button>
                                             </div>
                                         ) : (
-                                            <span className="text-xs font-bold text-amber-700 bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300"><i className="fas fa-clock mr-1"></i> ממתין לאישור ADMIN1</span>
+                                            <span className="text-xs font-bold text-amber-700 bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300"><i className="fas fa-clock mr-1"></i> ממתין לאישור מנהל ראשי</span>
                                         )}
                                     </div>
                                 )}
 
-                                {/* Header */}
+                                {/* Project Header Controls */}
                                 <div className="mb-6 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
                                             <input 
                                                 type="text" 
-                                                value={activeProject.name}
+                                                value={activeProject.name || ''}
                                                 onChange={(e) => updateProject(activeProject.id, 'name', e.target.value)}
                                                 className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 w-full mb-3 placeholder-slate-300"
                                                 placeholder="שם הפרויקט או התיקייה..."
@@ -661,7 +725,7 @@
                                                 <div>
                                                     <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wide">סטטוס</label>
                                                     <select 
-                                                        value={activeProject.status}
+                                                        value={activeProject.status || 'רעיון'}
                                                         onChange={(e) => updateProject(activeProject.id, 'status', e.target.value)}
                                                         className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg p-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     >
@@ -673,7 +737,7 @@
                                                 <div>
                                                     <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wide">עדיפות</label>
                                                     <select 
-                                                        value={activeProject.priority}
+                                                        value={activeProject.priority || 'בינונית'}
                                                         onChange={(e) => updateProject(activeProject.id, 'priority', e.target.value)}
                                                         className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg p-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     >
@@ -689,7 +753,7 @@
                                         </button>
                                     </div>
                                     
-                                    {/* Access Control section visible only to ADMIN1 */}
+                                    {/* Access Control section visible only to Superadmins */}
                                     {(loggedInUser === 'ADMIN1' || loggedInRole === 'superadmin') && (
                                         <div className="mt-5 pt-4 border-t border-slate-100">
                                             <h4 className="text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wide flex items-center gap-1"><i className="fas fa-eye"></i> מי יכול לראות פרויקט זה?</h4>
@@ -722,13 +786,14 @@
                                     )}
                                 </div>
 
+                                {}
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-10">
                                     <div className="lg:col-span-7 flex flex-col gap-6">
                                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                                             <h3 className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2">
                                                 <i className="fas fa-align-left text-blue-500"></i> הערות כלליות / תקציר
                                             </h3>
-                                            <textarea value={activeProject.description} onChange={(e) => updateProject(activeProject.id, 'description', e.target.value)} className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 text-sm" placeholder="הקלק כאן כדי להוסיף הערות כלליות..."/>
+                                            <textarea value={activeProject.description || ''} onChange={(e) => updateProject(activeProject.id, 'description', e.target.value)} className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 text-sm" placeholder="הקלק כאן כדי להוסיף הערות כלליות..."/>
                                         </div>
 
                                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col">
@@ -740,7 +805,7 @@
                                             </div>
 
                                             <div className="space-y-2 mb-4 max-h-60 overflow-y-auto pr-2">
-                                                {(activeProject.tasks || []).map(task => (
+                                                {(Array.isArray(activeProject.tasks) ? activeProject.tasks : []).map(task => (
                                                     <div key={task.id} className="flex items-center gap-3 group hover:bg-slate-50 p-2 rounded-lg transition-colors border border-transparent hover:border-slate-100">
                                                         <button onClick={() => toggleTask(activeProject.id, task.id)} className="text-slate-400 hover:text-blue-500 focus:outline-none mt-1 self-start">
                                                             {task.isDone ? <i className="fas fa-check-circle text-green-500 text-lg"></i> : <i className="far fa-circle text-lg"></i>}
@@ -808,7 +873,7 @@
                                             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
                                                 <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2"><i className="fas fa-code text-blue-400"></i> כספת קוד / קישורים</h3>
                                             </div>
-                                            <textarea value={activeProject.codeSnippet} onChange={(e) => updateProject(activeProject.id, 'codeSnippet', e.target.value)} className="flex-1 w-full p-4 bg-slate-900 text-green-400 font-mono text-sm resize-none focus:outline-none rounded-b-2xl leading-relaxed" placeholder="// הדבק כאן קוד או קישורים..." dir="ltr" />
+                                            <textarea value={activeProject.codeSnippet || ''} onChange={(e) => updateProject(activeProject.id, 'codeSnippet', e.target.value)} className="flex-1 w-full p-4 bg-slate-900 text-green-400 font-mono text-sm resize-none focus:outline-none rounded-b-2xl leading-relaxed" placeholder="// הדבק כאן קוד או קישורים..." dir="ltr" />
                                         </div>
                                     </div>
                                 </div>
@@ -828,7 +893,7 @@
                                         <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4"><i className="fas fa-check-circle text-blue-500"></i> משימות דחופות ופתוחות</h3>
                                         
                                         <div className="space-y-3">
-                                            {visibleProjects.flatMap(p => (p.tasks || []).filter(t => !t.isDone).map(t => ({...t, projectName: p.name, projectId: p.id})))
+                                            {visibleProjects.flatMap(p => (Array.isArray(p?.tasks) ? p.tasks : []).filter(t => !t.isDone).map(t => ({...t, projectName: p.name, projectId: p.id})))
                                                 .sort((a, b) => {
                                                     if (!a.dueDate) return 1;
                                                     if (!b.dueDate) return -1;
@@ -851,7 +916,7 @@
                                                         )}
                                                     </div>
                                                 ))}
-                                            {visibleProjects.flatMap(p => (p.tasks || []).filter(t => !t.isDone)).length === 0 && (
+                                            {visibleProjects.flatMap(p => (Array.isArray(p?.tasks) ? p.tasks : []).filter(t => !t.isDone)).length === 0 && (
                                                 <div className="text-center py-10 text-slate-500">
                                                     <i className="fas fa-glass-cheers text-4xl mb-4 text-emerald-400"></i>
                                                     <p className="font-medium text-lg">איזה יופי! אין לך משימות פתוחות בכלל.</p>
@@ -868,7 +933,11 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        );
     </script>
 </body>
 </html>
