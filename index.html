@@ -1,0 +1,725 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  FolderDot, Plus, Trash2, CheckCircle2, Circle, Code, 
+  AlignLeft, Download, Upload, LayoutList, Cloud, 
+  UserCircle, Lock, LogOut, History, Clock,
+  Calendar, Phone, ShoppingCart, Briefcase, LayoutDashboard, Tag, AlertCircle
+} from 'lucide-react';
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, onSnapshot, doc, setDoc } from "firebase/firestore";
+
+// --- Firebase Configuration ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCVEQHiEk0WEzhnmpFYQ4M9hkrIykYSr8E",
+  authDomain: "yoman-92dee.firebaseapp.com",
+  projectId: "yoman-92dee",
+  storageBucket: "yoman-92dee.firebasestorage.app",
+  messagingSenderId: "1080774869066",
+  appId: "1:1080774869066:web:9eb2c274e3dd821e20e6b3",
+  measurementId: "G-TBY4DXNV91"
+};
+
+// Initialize Firebase App and Firestore
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// --- User Credentials ---
+const USERS = {
+  'ADMIN1': 'ADMIN111',
+  'ADMIN2': 'ADMIN'
+};
+
+// Initial Projects Template
+const INITIAL_PROJECTS = [
+  { id: '1', name: 'TOURIZIS אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '2', name: 'כרטיסי גירוד - קמפיין תרומות', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '3', name: 'TOPHANEGEV אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '4', name: 'ORIZISCAP אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '5', name: 'אתר לניתוח מכרזים', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '6', name: 'ORIZISREAL אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '7', name: 'סיבריז - קמפיינים', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '8', name: 'NETABEL - אתר התחשבנות', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '9', name: 'MYHOME - אתר דרופ לייצר רווחים', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '10', name: 'VERISESS אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '11', name: 'ZEDMALL', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+  { id: '12', name: 'COLLEXEN אתר', description: '', status: 'רעיון', priority: 'בינונית', tasks: [], codeSnippet: '', logs: [] },
+];
+
+export default function App() {
+  const [projects, setProjects] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState(null); // null means dashboard view
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loggedInUser, setLoggedInUser] = useState(null);
+  
+  // Login State
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Setup Firebase Listener
+  useEffect(() => {
+    if (!loggedInUser) return;
+
+    const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
+      const dbProjects = [];
+      snapshot.forEach((doc) => {
+        dbProjects.push({ id: doc.id, ...doc.data() });
+      });
+
+      // If DB is empty, initialize with defaults
+      if (dbProjects.length === 0) {
+        INITIAL_PROJECTS.forEach(proj => {
+          setDoc(doc(collection(db, "projects"), proj.id), proj);
+        });
+        setProjects(INITIAL_PROJECTS);
+      } else {
+        // Sort by ID to maintain order
+        dbProjects.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+        setProjects(dbProjects);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [loggedInUser]);
+
+  // Update state and Firebase
+  const updateCloud = (updatedProjects) => {
+    setProjects(updatedProjects);
+    updatedProjects.forEach(proj => {
+      setDoc(doc(collection(db, "projects"), proj.id), proj);
+    });
+  };
+
+  // Helper to add audit log
+  const addLog = (projectId, actionDescription) => {
+    const timestamp = new Date().toLocaleString('he-IL');
+    const newLog = {
+      id: Date.now().toString(),
+      user: loggedInUser,
+      action: actionDescription,
+      time: timestamp
+    };
+    return newLog;
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (USERS[usernameInput] && USERS[usernameInput] === passwordInput) {
+      setLoggedInUser(usernameInput);
+      setLoginError('');
+    } else {
+      setLoginError('שם משתמש או סיסמה שגויים');
+    }
+  };
+
+  const handleLogout = () => {
+    setLoggedInUser(null);
+    setUsernameInput('');
+    setPasswordInput('');
+    setActiveProjectId(null);
+  };
+
+  const createNewProject = () => {
+    const newProject = {
+      id: Date.now().toString(),
+      name: 'פרויקט / תיקייה חדשה',
+      description: '',
+      status: 'רעיון',
+      priority: 'בינונית',
+      tasks: [],
+      codeSnippet: '',
+      logs: [addLog(Date.now().toString(), 'יצר פרויקט חדש')]
+    };
+    const updatedProjects = [newProject, ...projects];
+    updateCloud(updatedProjects);
+    setActiveProjectId(newProject.id);
+  };
+
+  const updateProject = (id, field, value) => {
+    let actionDesc = '';
+    if (field === 'status') actionDesc = `שינה סטטוס ל-${value}`;
+    if (field === 'priority') actionDesc = `שינה עדיפות ל-${value}`;
+    if (field === 'codeSnippet') actionDesc = `ערך את כספת הקוד`;
+    if (field === 'name') actionDesc = `שינה שם ל-${value}`;
+    if (field === 'description') actionDesc = `עדכן תיאור פרויקט`;
+
+    updateCloud(projects.map(p => {
+      if (p.id === id) {
+        const updatedProject = { ...p, [field]: value };
+        if (actionDesc) {
+           updatedProject.logs = [addLog(id, actionDesc), ...(p.logs || [])].slice(0, 50); // keep last 50
+        }
+        return updatedProject;
+      }
+      return p;
+    }));
+  };
+
+  const deleteProject = (id) => {
+    const pName = projects.find(p=>p.id===id)?.name || 'פרויקט';
+    const confirmDelete = window.confirm(`האם אתה בטוח שברצונך למחוק את "${pName}"?`);
+    if(confirmDelete) {
+      // Note: we don't log deletion inside the project since it's deleted. 
+      // Ideally this would go to a global log.
+      updateCloud(projects.filter(p => p.id !== id));
+      if (activeProjectId === id) setActiveProjectId(null);
+    }
+  };
+
+  const addTask = (projectId, taskText, dueDate, category) => {
+    if (!taskText.trim()) return;
+    const newTask = { 
+      id: Date.now().toString(), 
+      text: taskText, 
+      isDone: false,
+      dueDate: dueDate || null,
+      category: category || 'general'
+    };
+    
+    updateCloud(projects.map(p => {
+      if (p.id === projectId) {
+        const updatedProject = { ...p, tasks: [...p.tasks, newTask] };
+        updatedProject.logs = [addLog(projectId, `הוסיף משימה: "${taskText}"`), ...(p.logs || [])].slice(0, 50);
+        return updatedProject;
+      }
+      return p;
+    }));
+  };
+
+  const toggleTask = (projectId, taskId) => {
+    updateCloud(projects.map(p => {
+      if (p.id === projectId) {
+        const task = p.tasks.find(t => t.id === taskId);
+        const newState = !task.isDone;
+        const actionDesc = newState ? `סיים משימה: "${task.text}"` : `החזיר משימה לעבודה: "${task.text}"`;
+        
+        const updatedProject = {
+          ...p,
+          tasks: p.tasks.map(t => t.id === taskId ? { ...t, isDone: newState } : t)
+        };
+        updatedProject.logs = [addLog(projectId, actionDesc), ...(p.logs || [])].slice(0, 50);
+        return updatedProject;
+      }
+      return p;
+    }));
+  };
+
+  const deleteTask = (projectId, taskId) => {
+    updateCloud(projects.map(p => {
+      if (p.id === projectId) {
+        const task = p.tasks.find(t => t.id === taskId);
+        const updatedProject = { ...p, tasks: p.tasks.filter(t => t.id !== taskId) };
+        updatedProject.logs = [addLog(projectId, `מחק משימה: "${task?.text || ''}"`), ...(p.logs || [])].slice(0, 50);
+        return updatedProject;
+      }
+      return p;
+    }));
+  };
+
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const filteredProjects = projects.filter(p => p.name.includes(searchTerm));
+
+  const calculateProgress = (tasks) => {
+    if (!tasks || tasks.length === 0) return 0;
+    const completed = tasks.filter(t => t.isDone).length;
+    return Math.round((completed / tasks.length) * 100);
+  };
+
+  const getPriorityColor = (priority) => {
+    switch(priority) {
+      case 'גבוהה': return 'bg-red-100 text-red-800 border-red-200';
+      case 'בינונית': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'נמוכה': return 'bg-blue-100 text-blue-800 border-blue-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'הושלם': return 'bg-green-100 text-green-800 border-green-200';
+      case 'בעבודה': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'רעיון': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getCategoryIcon = (category) => {
+    switch(category) {
+      case 'meeting': return <Briefcase className="w-4 h-4 text-purple-500" />;
+      case 'phone': return <Phone className="w-4 h-4 text-emerald-500" />;
+      case 'errand': return <ShoppingCart className="w-4 h-4 text-orange-500" />;
+      case 'code': return <Code className="w-4 h-4 text-blue-500" />;
+      default: return <Tag className="w-4 h-4 text-slate-400" />;
+    }
+  };
+
+  const isOverdue = (dateString) => {
+    if (!dateString) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(dateString);
+    return dueDate < today;
+  };
+
+  if (!loggedInUser) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center font-sans" dir="rtl">
+        <div className="bg-white p-10 rounded-3xl shadow-xl max-w-md w-full border border-slate-200">
+          <div className="flex justify-center mb-6">
+            <div className="bg-blue-100 p-4 rounded-full">
+              <Lock className="w-10 h-10 text-blue-600" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-center text-slate-800 mb-2">מערכת ניהול משימות</h1>
+          <p className="text-center text-slate-500 mb-8">התחבר כדי לגשת לפרויקטים המשותפים</p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">שם משתמש</label>
+              <input 
+                type="text" 
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value.toUpperCase())}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-left dir-ltr font-mono"
+                placeholder="ADMIN1 / ADMIN2"
+                required
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">סיסמה</label>
+              <input 
+                type="password" 
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-left dir-ltr font-mono"
+                placeholder="••••••"
+                required
+                dir="ltr"
+              />
+            </div>
+            
+            {loginError && <p className="text-red-500 text-sm text-center font-medium bg-red-50 p-2 rounded-lg">{loginError}</p>}
+            
+            <button 
+              type="submit" 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-md mt-4"
+            >
+              התחבר למערכת
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-slate-50 font-sans" dir="rtl">
+      
+      {/* Sidebar - Project List */}
+      <div className="w-1/3 max-w-sm bg-white border-l border-slate-200 flex flex-col shadow-sm z-10">
+        <div className="p-4 border-b border-slate-200 bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <LayoutList className="w-6 h-6 text-blue-600" />
+              המרכזייה
+            </h1>
+            <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-slate-100" title="התנתק">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="flex items-center justify-between text-xs mb-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
+            <div className="flex items-center gap-2 text-slate-600">
+              <UserCircle className="w-4 h-4 text-blue-500" />
+              <span>מחובר: <strong>{loggedInUser}</strong></span>
+            </div>
+            <div className="flex items-center gap-1 text-emerald-600" title="מחובר ומסונכרן לענן">
+              <Cloud className="w-4 h-4" />
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setActiveProjectId(null)}
+            className={`w-full font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-colors mb-2 shadow-sm border ${
+              activeProjectId === null 
+                ? 'bg-slate-800 text-white border-slate-900' 
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+            }`}
+          >
+            <LayoutDashboard className="w-5 h-5" />
+            לוח משימות גלובלי
+          </button>
+
+          <button 
+            onClick={createNewProject}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            פרויקט / תיקייה חדשה
+          </button>
+
+          <input 
+            type="text"
+            placeholder="חיפוש פרויקט..."
+            className="w-full mt-3 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2">
+          {filteredProjects.length === 0 ? (
+            <div className="text-center text-slate-400 mt-10">
+              <FolderDot className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>אין פרויקטים להצגה.</p>
+            </div>
+          ) : (
+            filteredProjects.map(project => {
+              const progress = calculateProgress(project.tasks);
+              return (
+                <div 
+                  key={project.id}
+                  onClick={() => setActiveProjectId(project.id)}
+                  className={`p-3 mb-2 rounded-xl border cursor-pointer transition-all ${
+                    activeProjectId === project.id 
+                      ? 'bg-blue-50 border-blue-300 shadow-sm' 
+                      : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="font-semibold text-slate-800 mb-1">{project.name || 'ללא שם'}</div>
+                  <div className="flex gap-2 mb-2 text-xs flex-wrap">
+                    <span className={`px-2 py-0.5 rounded-full border ${getStatusColor(project.status)}`}>
+                      {project.status}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full border ${getPriorityColor(project.priority)}`}>
+                      עדיפות: {project.priority}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200 font-medium">
+                      {project.tasks?.filter(t=>!t.isDone).length || 0} פתוחות
+                    </span>
+                  </div>
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
+        
+        {/* Render Project Details or Global Dashboard */}
+        {activeProjectId && activeProject ? (
+          <div className="flex-1 overflow-y-auto p-6 md:p-8">
+            
+            {/* Header & Title */}
+            <div className="flex justify-between items-start mb-6 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex-1">
+                <input 
+                  type="text" 
+                  value={activeProject.name}
+                  onChange={(e) => updateProject(activeProject.id, 'name', e.target.value)}
+                  className="text-2xl font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 w-full mb-3 placeholder-slate-300"
+                  placeholder="שם הפרויקט או התיקייה..."
+                />
+                
+                <div className="flex gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wide">סטטוס</label>
+                    <select 
+                      value={activeProject.status}
+                      onChange={(e) => updateProject(activeProject.id, 'status', e.target.value)}
+                      className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg p-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="רעיון">💡 רעיון</option>
+                      <option value="בעבודה">⚙️ בעבודה</option>
+                      <option value="הושלם">✅ הושלם</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wide">עדיפות</label>
+                    <select 
+                      value={activeProject.priority}
+                      onChange={(e) => updateProject(activeProject.id, 'priority', e.target.value)}
+                      className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg p-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="גבוהה">🔴 גבוהה</option>
+                      <option value="בינונית">🟡 בינונית</option>
+                      <option value="נמוכה">🔵 נמוכה</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => deleteProject(activeProject.id)}
+                className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-xl transition-colors border border-transparent hover:border-red-100"
+                title="מחק פרויקט"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Center Column - Tasks (Wider) */}
+              <div className="lg:col-span-7 flex flex-col gap-6">
+                
+                {/* Description */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                  <h3 className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <AlignLeft className="w-4 h-4 text-blue-500" />
+                    הערות כלליות / תקציר
+                  </h3>
+                  <textarea 
+                    value={activeProject.description}
+                    onChange={(e) => updateProject(activeProject.id, 'description', e.target.value)}
+                    className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 text-sm"
+                    placeholder="הקלק כאן כדי להוסיף הערות כלליות, מטרות או תיאור..."
+                  />
+                </div>
+
+                {/* Tasks */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col">
+                  <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                    <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                      משימות ופעולות
+                    </h3>
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                      {calculateProgress(activeProject.tasks)}% הושלם
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 mb-4 max-h-60 overflow-y-auto pr-2">
+                    {activeProject.tasks.map(task => (
+                      <div key={task.id} className="flex items-center gap-3 group hover:bg-slate-50 p-2 rounded-lg transition-colors border border-transparent hover:border-slate-100">
+                        <button onClick={() => toggleTask(activeProject.id, task.id)} className="text-slate-400 hover:text-blue-500 focus:outline-none mt-1 self-start">
+                          {task.isDone ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Circle className="w-5 h-5" />}
+                        </button>
+                        <div className={`flex-1 flex flex-col ${task.isDone ? 'opacity-50' : ''}`}>
+                          <span className={`text-sm font-medium ${task.isDone ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                            {task.text}
+                          </span>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            {task.category && task.category !== 'general' && (
+                              <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md font-medium">
+                                {getCategoryIcon(task.category)}
+                                <span>{
+                                  task.category === 'meeting' ? 'פגישה' :
+                                  task.category === 'phone' ? 'שיחה' :
+                                  task.category === 'errand' ? 'סידורים' :
+                                  task.category === 'code' ? 'פיתוח' : 'משימה'
+                                }</span>
+                              </div>
+                            )}
+                            {task.dueDate && (
+                              <div className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md ${isOverdue(task.dueDate) && !task.isDone ? 'text-red-600 bg-red-50 font-bold border border-red-100' : 'text-slate-500 bg-slate-100 border border-slate-200'}`}>
+                                {isOverdue(task.dueDate) && !task.isDone ? <AlertCircle className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
+                                {new Date(task.dueDate).toLocaleDateString('he-IL')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => deleteTask(activeProject.id, task.id)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-opacity focus:outline-none self-start mt-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {activeProject.tasks.length === 0 && (
+                      <p className="text-sm text-slate-400 text-center py-4">אין משימות. הוסף משימה ראשונה למטה.</p>
+                    )}
+                  </div>
+
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const input = e.target.elements.taskInput;
+                      const dateInput = e.target.elements.dateInput;
+                      const catInput = e.target.elements.catInput;
+                      addTask(activeProject.id, input.value, dateInput.value, catInput.value);
+                      input.value = '';
+                      dateInput.value = '';
+                      catInput.value = 'general';
+                    }}
+                    className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-inner mt-auto"
+                  >
+                    <input 
+                      name="taskInput"
+                      type="text" 
+                      placeholder="מה צריך לעשות?"
+                      required
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                    />
+                    <div className="flex gap-2">
+                      <select name="catInput" className="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600 shadow-sm">
+                        <option value="general">📝 כללי</option>
+                        <option value="meeting">🤝 פגישה/תיאום</option>
+                        <option value="phone">📞 שיחה</option>
+                        <option value="errand">🛒 סידורים</option>
+                        <option value="code">💻 קוד/טכני</option>
+                      </select>
+                      <input 
+                        name="dateInput"
+                        type="date" 
+                        className="flex-1 p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600 shadow-sm"
+                      />
+                      <button type="submit" className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm">
+                        הוסף
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              {/* Left Column - Code & Audit Logs (Narrower) */}
+              <div className="lg:col-span-5 flex flex-col gap-6">
+                
+                {/* Audit Logs */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-64 flex flex-col">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                      <History className="w-4 h-4 text-blue-500" />
+                      יומן פעולות ומעקב
+                    </h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {activeProject.logs && activeProject.logs.length > 0 ? (
+                      activeProject.logs.map(log => (
+                        <div key={log.id} className="text-xs flex items-start gap-2 border-b border-slate-50 pb-2 last:border-0">
+                          <div className="bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">
+                            {log.user}
+                          </div>
+                          <div>
+                            <span className="text-slate-700 font-medium">{log.action}</span>
+                            <div className="text-slate-400 text-[10px] mt-0.5 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {log.time}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 text-center py-4">אין תיעוד לפרויקט זה עדיין.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Code Snippet Vault */}
+                <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 flex flex-col flex-1 min-h-[300px]">
+                  <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                      <Code className="w-4 h-4 text-blue-400" />
+                      כספת קוד / קישורים
+                    </h3>
+                  </div>
+                  <textarea 
+                    value={activeProject.codeSnippet}
+                    onChange={(e) => updateProject(activeProject.id, 'codeSnippet', e.target.value)}
+                    className="flex-1 w-full p-4 bg-slate-900 text-green-400 font-mono text-sm resize-none focus:outline-none rounded-b-2xl leading-relaxed"
+                    placeholder="// הדבק כאן שורות קוד, קישורים, או רפרנסים חשובים...&#10;// נתונים אלו לא ילכו לאיבוד ויסונכרנו לענן."
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-100">
+            <div className="max-w-4xl mx-auto">
+              {/* Dashboard Header */}
+              <div className="flex items-center gap-4 mb-8">
+                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-4 rounded-2xl shadow-lg text-white">
+                  <LayoutDashboard className="w-8 h-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">לוח משימות חכם גלובלי</h2>
+                  <p className="text-slate-500 font-medium">ברוך הבא {loggedInUser}! הנה ריכוז של כל המשימות הפתוחות שלך מכלל הפרויקטים.</p>
+                </div>
+              </div>
+
+              {/* Dashboard Content */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
+                  <CheckCircle2 className="w-5 h-5 text-blue-500" />
+                  משימות דחופות ופתוחות
+                </h3>
+                
+                <div className="space-y-3">
+                  {projects.flatMap(p => p.tasks.filter(t => !t.isDone).map(t => ({...t, projectName: p.name, projectId: p.id})))
+                    .sort((a, b) => {
+                      if (!a.dueDate) return 1;
+                      if (!b.dueDate) return -1;
+                      return new Date(a.dueDate) - new Date(b.dueDate);
+                    }).length > 0 ? (
+                      projects.flatMap(p => p.tasks.filter(t => !t.isDone).map(t => ({...t, projectName: p.name, projectId: p.id})))
+                      .sort((a, b) => {
+                        if (!a.dueDate) return 1;
+                        if (!b.dueDate) return -1;
+                        return new Date(a.dueDate) - new Date(b.dueDate);
+                      })
+                      .map(task => (
+                        <div key={task.id} className="flex items-center justify-between group bg-white hover:bg-slate-50 p-4 rounded-2xl transition-all border border-slate-100 shadow-sm hover:shadow-md">
+                          <div className="flex items-start gap-4">
+                            <button onClick={() => toggleTask(task.projectId, task.id)} className="text-slate-300 hover:text-green-500 focus:outline-none transition-colors mt-0.5">
+                              <Circle className="w-6 h-6" />
+                            </button>
+                            <div className="flex flex-col">
+                              <span className="text-base font-bold text-slate-700 mb-1">{task.text}</span>
+                              <div className="flex items-center flex-wrap gap-2">
+                                <button 
+                                  onClick={() => setActiveProjectId(task.projectId)}
+                                  className="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-bold transition-colors border border-blue-200 flex items-center gap-1"
+                                >
+                                  <FolderDot className="w-3 h-3" />
+                                  {task.projectName}
+                                </button>
+                                {task.category && task.category !== 'general' && (
+                                  <div className="flex items-center gap-1 text-[11px] text-slate-600 bg-slate-100 px-2 py-1 rounded-md font-medium border border-slate-200">
+                                    {getCategoryIcon(task.category)}
+                                    <span>{
+                                      task.category === 'meeting' ? 'פגישה' :
+                                      task.category === 'phone' ? 'שיחה' :
+                                      task.category === 'errand' ? 'סידורים' :
+                                      task.category === 'code' ? 'פיתוח' : 'משימה'
+                                    }</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {task.dueDate && (
+                            <div className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border shadow-sm ${isOverdue(task.dueDate) ? 'bg-red-50 text-red-700 border-red-200 font-bold' : 'bg-white text-slate-600 border-slate-200 font-medium'}`}>
+                              {isOverdue(task.dueDate) ? <AlertCircle className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
+                              {new Date(task.dueDate).toLocaleDateString('he-IL')}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                      </div>
+                      <h4 className="text-xl font-bold text-slate-800 mb-2">הכל נקי!</h4>
+                      <p className="text-slate-500 font-medium max-w-sm mx-auto">איזה יופי! אין לך משימות פתוחות בכלל. זה הזמן לנוח או ליצור פרויקט חדש.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
