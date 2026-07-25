@@ -337,14 +337,18 @@
             return Promise.resolve(false);
         };
 
-        // תגית מצב לינק: 2xx/3xx = חי, 404 = תקול, ERR/none = לא אומת
+        // תגית מצב לינק: 2xx/3xx = חי, Hxxx = חי אך רק ב-HTTP (חסר HTTPS), 4xx/5xx = תקול, ERR/none = לא אומת
         const linkStatusMeta = (status) => {
+            if (/^H/.test(status)) return { label: 'חי · לתקן HTTPS', cls: 'bg-amber-100 text-amber-800 border-amber-200', dot: 'bg-amber-500' };
             if (/^2/.test(status)) return { label: 'חי', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' };
             if (/^3/.test(status)) return { label: 'הפניה', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' };
             if (/^4|^5/.test(status)) return { label: 'שגיאה ' + status, cls: 'bg-red-100 text-red-800 border-red-200', dot: 'bg-red-500' };
             if (status === 'none') return { label: 'לא פרוס', cls: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' };
             return { label: 'לא אומת', cls: 'bg-amber-100 text-amber-800 border-amber-200', dot: 'bg-amber-500' };
         };
+
+        // כתובת פתיחה אפקטיבית: אם רק HTTP חי (חסר HTTPS) — לפתוח ב-http כדי שהקישור יעבוד
+        const effHref = (l) => { if (!l || !l.url) return ''; return /^H/.test(l.status) ? l.url.replace(/^https:/, 'http:') : l.url; };
 
         function App() {
             const [dbUser, setDbUser] = useState(null);
@@ -954,8 +958,8 @@
                                                         <div className="text-[11px] font-bold text-slate-400 mb-1 uppercase">אתר חי</div>
                                                         {backupSel.url ? (
                                                             <div className="flex items-center gap-2">
-                                                                <a href={backupSel.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm break-all flex-1" dir="ltr">{backupSel.url}</a>
-                                                                <button onClick={() => copyText(backupSel.url).then(ok => setToast(ok ? 'הקישור הועתק' : 'נכשל'))} className="text-slate-400 hover:text-slate-700 flex-shrink-0"><i className="fas fa-copy"></i></button>
+                                                                <a href={effHref(backupSel)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm break-all flex-1" dir="ltr">{backupSel.url}</a>
+                                                                <button onClick={() => copyText(effHref(backupSel)).then(ok => setToast(ok ? 'הקישור הועתק' : 'נכשל'))} className="text-slate-400 hover:text-slate-700 flex-shrink-0"><i className="fas fa-copy"></i></button>
                                                             </div>
                                                         ) : <span className="text-sm text-slate-400">— לא פרוס</span>}
                                                     </div>
@@ -1258,7 +1262,7 @@
                                             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-indigo-50 flex-wrap gap-2">
                                                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2"><i className="fas fa-scroll text-indigo-500"></i> פרומפט מסירה + קישור חי (גיבוי)</h3>
                                                 <div className="flex items-center gap-2">
-                                                    {link && link.url && <a href={link.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="fas fa-external-link-alt"></i> אתר חי</a>}
+                                                    {link && link.url && <a href={effHref(link)} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="fas fa-external-link-alt"></i> אתר חי</a>}
                                                     {hfText && <button onClick={() => copyText(hfText).then(ok => setToast(ok ? 'פרומפט המסירה הועתק — פתח צ\'אט חדש והדבק' : 'נכשל'))} className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="fas fa-copy"></i> העתק פרומפט</button>}
                                                 </div>
                                             </div>
