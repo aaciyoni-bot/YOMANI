@@ -14,6 +14,9 @@
     <!-- Babel (Reliable CDNJS version) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
 
+    <!-- נתוני גיבוי: קישורים חיים + פרומפטי מסירה לכל הפרויקטים (נבנה אוטומטית ע"י קלוד) -->
+    <script src="handoffs.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&display=swap');
         body {
@@ -292,6 +295,57 @@
             ]},
         ];
 
+        // נתוני הגיבוי שנטענו מ-handoffs.js (קישורים חיים + פרומפטי מסירה לכל פרויקט)
+        const PROJECT_DATA = (typeof window !== 'undefined' && window.CLAUDE_PROJECT_DATA) || { links: [], handoffs: {}, generatedAt: '' };
+
+        // מיפוי צ'אט (sid) → מפתח פרומפט המסירה, כדי להציג את הפרומפט בתוך לשונית הפרויקט
+        const SID_TO_HANDOFF = {
+            'local_883313ed-7878-4578-9c0a-95bbf9ea98ef': 'orizis-group',
+            'local_d1a7bf2f-6d37-42c4-abfc-9e8b0b458f31': 'hanut-tal-niv',
+            'local_6a3de54f-3786-444e-8f02-1410cc4ba853': 'kicker-magazine',
+            'local_8a1240a3-e18c-443b-bd62-bd767822c5ea': 'uziel',
+            'local_9545c8f0-cce5-4c99-9a95-9b5f57f8f900': 'TIYUL',
+            'local_392bf4bb-d170-46de-b316-325a5eea08b3': 'ROTEM',
+            'local_c528a8b1-a5a9-4c91-97f2-832eae273e8b': 'YOMANI',
+            'local_6d5b3604-8ab8-4a83-9cec-1583df282fd6': 'SCRATCH',
+            'local_74b13214-8d4f-46c8-a5fa-858489489fe5': '189',
+            'local_734a9391-5ab8-4ccd-bb72-35e653f39fce': 'TOPHANEGEV',
+            'local_980b6580-df3a-4ff2-ad6c-99db0ba0be44': 'TOURIZIS',
+            'local_855a0094-9311-4f7a-87aa-305b3358a5a8': 'ASFANUT',
+            'local_f6a970d0-9b6b-4b7e-a524-2e1613088fb0': 'DOH1',
+            'local_2d48925e-3dd1-487d-a098-96304caef5f1': 'citycheck',
+            'local_27b77123-50cf-4eb3-be12-1955ab7d396f': 'collexen',
+            'local_e7633d6c-15f4-486b-8865-38fbbb83dc33': 'adlipa',
+            'local_60cba2b6-c53a-4c34-95f1-50ca933aa9c1': 'ORENF',
+            'local_a1a1bce2-43b7-4379-9d4e-999e13c51512': 'oriziscapital',
+            'local_a8f5be7c-41b6-4f31-89fe-1aea538020d3': 'windflow-ac',
+            'local_cef0386d-c971-4a23-9f91-6bc3e0e51be2': 'ORIZJOREAL',
+            'local_d2869a0b-2d45-49e5-9225-c4b35f16e197': 'royal777',
+            'local_43108335-ed57-4e1f-8d82-250d6b286fef': 'VERISESS',
+            'local_847205a4-957b-432b-b2bf-1b3da67b38db': 'orizis-games',
+            'local_d3e24ba9-8ede-42f5-9942-41c1a8313c19': 'veripoints',
+            'local_5dd4119f-3903-418b-acca-ddf2a829400a': 'yehonatan-realestate',
+            'local_7639e18a-222a-42e6-8801-92c1041d50ff': 'orizisweb',
+            'local_108147e8-6f8d-487e-aefd-0953ab6bf901': 'CHASIDOOT',
+            'local_25329d4d-ab75-4cd2-b14e-4e32553f2f51': 'k-fitness',
+        };
+
+        const copyText = (text) => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
+            }
+            return Promise.resolve(false);
+        };
+
+        // תגית מצב לינק: 2xx/3xx = חי, 404 = תקול, ERR/none = לא אומת
+        const linkStatusMeta = (status) => {
+            if (/^2/.test(status)) return { label: 'חי', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' };
+            if (/^3/.test(status)) return { label: 'הפניה', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' };
+            if (/^4|^5/.test(status)) return { label: 'שגיאה ' + status, cls: 'bg-red-100 text-red-800 border-red-200', dot: 'bg-red-500' };
+            if (status === 'none') return { label: 'לא פרוס', cls: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' };
+            return { label: 'לא אומת', cls: 'bg-amber-100 text-amber-800 border-amber-200', dot: 'bg-amber-500' };
+        };
+
         function App() {
             const [dbUser, setDbUser] = useState(null);
             
@@ -306,6 +360,9 @@
             const [passwordInput, setPasswordInput] = useState('');
             const [loginError, setLoginError] = useState('');
             const [toast, setToast] = useState('');
+            const [showBackup, setShowBackup] = useState(false);
+            const [backupSel, setBackupSel] = useState(null);
+            const [backupSearch, setBackupSearch] = useState('');
 
             const [projectToDelete, setProjectToDelete] = useState(null);
             const [deleteRequestModalProject, setDeleteRequestModalProject] = useState(null);
@@ -835,9 +892,98 @@
                 <div className="flex h-screen bg-slate-50 overflow-hidden">
 
                     {toast && (
-                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl border border-slate-700 text-sm font-medium max-w-md text-center modal-enter flex items-center gap-2">
+                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl border border-slate-700 text-sm font-medium max-w-md text-center modal-enter flex items-center gap-2">
                             <i className="fas fa-circle-info text-blue-400"></i>
                             <span>{toast}</span>
+                        </div>
+                    )}
+
+                    {showBackup && (
+                        <div className="fixed inset-0 z-[70] flex bg-slate-900 bg-opacity-60 backdrop-blur-sm" onClick={() => setShowBackup(false)}>
+                            <div className="m-auto bg-white rounded-2xl shadow-2xl w-[95vw] max-w-6xl h-[88vh] flex flex-col overflow-hidden modal-enter border border-slate-200" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50">
+                                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                        <i className="fas fa-vault text-amber-500"></i> מרכז גיבוי ומסירה
+                                        <span className="text-xs font-normal text-slate-400">· {PROJECT_DATA.links.length} פרויקטים · עודכן {PROJECT_DATA.generatedAt}</span>
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => { const all = PROJECT_DATA.links.map(l => `${l.name}${l.url ? ' — ' + l.url : ''}${l.repo ? ' — github.com/aaciyoni-bot/' + l.repo : ''}`).join('\n'); copyText('כל הקישורים החיים של הפרויקטים:\n\n' + all).then(ok => setToast(ok ? `כל ${PROJECT_DATA.links.length} הקישורים הועתקו ללוח` : 'ההעתקה נכשלה')); }} className="text-xs font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="fas fa-copy"></i> העתק את כל הקישורים</button>
+                                        <button onClick={() => setShowBackup(false)} className="text-slate-400 hover:text-slate-600"><i className="fas fa-times text-xl"></i></button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 flex overflow-hidden">
+                                    <div className="w-[320px] border-l border-slate-200 flex flex-col bg-slate-50 flex-shrink-0">
+                                        <div className="p-3 border-b border-slate-200">
+                                            <input value={backupSearch} onChange={e => setBackupSearch(e.target.value)} placeholder="חיפוש פרויקט / דומיין..." className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-2">
+                                            {(() => {
+                                                const q = backupSearch.trim();
+                                                const filtered = PROJECT_DATA.links.filter(l => !q || l.name.includes(q) || (l.url || '').includes(q) || (l.repo || '').includes(q));
+                                                if (!filtered.length) return <p className="text-center text-slate-400 text-sm mt-6">לא נמצאו פרויקטים.</p>;
+                                                const cats = [];
+                                                filtered.forEach(l => { if (!cats.includes(l.cat)) cats.push(l.cat); });
+                                                return cats.map(cat => (
+                                                    <div key={cat} className="mb-3">
+                                                        <div className="text-[11px] font-bold text-slate-400 px-2 mb-1 uppercase tracking-wide">{cat}</div>
+                                                        {filtered.filter(l => l.cat === cat).map(l => {
+                                                            const m = linkStatusMeta(l.status);
+                                                            const active = backupSel && backupSel.name === l.name;
+                                                            return (
+                                                                <button key={l.name} onClick={() => setBackupSel(l)} className={`w-full text-right flex items-center gap-2 p-2 rounded-lg mb-1 transition-colors ${active ? 'bg-blue-100 border border-blue-300' : 'hover:bg-white border border-transparent'}`}>
+                                                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${m.dot}`}></span>
+                                                                    <span className="text-sm text-slate-700 truncate flex-1">{l.name}</span>
+                                                                    {PROJECT_DATA.handoffs[l.hf] && <i className="fas fa-file-alt text-slate-300 text-xs" title="יש פרומפט מסירה"></i>}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-6">
+                                        {backupSel ? (
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-4 flex-wrap">
+                                                    <h2 className="text-2xl font-bold text-slate-800">{backupSel.name}</h2>
+                                                    {(() => { const m = linkStatusMeta(backupSel.status); return <span className={`text-xs px-2.5 py-1 rounded-full border font-bold ${m.cls}`}>{m.label}</span>; })()}
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                                        <div className="text-[11px] font-bold text-slate-400 mb-1 uppercase">אתר חי</div>
+                                                        {backupSel.url ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <a href={backupSel.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm break-all flex-1" dir="ltr">{backupSel.url}</a>
+                                                                <button onClick={() => copyText(backupSel.url).then(ok => setToast(ok ? 'הקישור הועתק' : 'נכשל'))} className="text-slate-400 hover:text-slate-700 flex-shrink-0"><i className="fas fa-copy"></i></button>
+                                                            </div>
+                                                        ) : <span className="text-sm text-slate-400">— לא פרוס</span>}
+                                                    </div>
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                                        <div className="text-[11px] font-bold text-slate-400 mb-1 uppercase">מאגר קוד (GitHub)</div>
+                                                        {backupSel.repo ? (
+                                                            <a href={`https://github.com/aaciyoni-bot/${backupSel.repo}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm break-all" dir="ltr">github.com/aaciyoni-bot/{backupSel.repo}</a>
+                                                        ) : <span className="text-sm text-slate-400">—</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                                                    <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
+                                                        <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><i className="fas fa-scroll text-indigo-500"></i> פרומפט מסירה (גיבוי מלא)</h4>
+                                                        {PROJECT_DATA.handoffs[backupSel.hf] && (
+                                                            <button onClick={() => copyText(PROJECT_DATA.handoffs[backupSel.hf]).then(ok => setToast(ok ? 'פרומפט המסירה הועתק — פתח צ\'אט חדש והדבק' : 'נכשל'))} className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="fas fa-copy"></i> העתק פרומפט</button>
+                                                        )}
+                                                    </div>
+                                                    {PROJECT_DATA.handoffs[backupSel.hf] ? (
+                                                        <pre className="p-4 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed max-h-[45vh] overflow-y-auto font-sans" dir="rtl">{PROJECT_DATA.handoffs[backupSel.hf]}</pre>
+                                                    ) : (
+                                                        <div className="p-6 text-center text-slate-400 text-sm">אין פרומפט מסירה שמור לפרויקט זה.</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : <div className="text-center text-slate-400 mt-20">בחר פרויקט מהרשימה.</div>}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -1102,6 +1248,32 @@
                                     )}
                                 </div>
 
+                                {(() => {
+                                    const hfKey = activeProject.claudeSid && SID_TO_HANDOFF[activeProject.claudeSid];
+                                    const hfText = hfKey ? PROJECT_DATA.handoffs[hfKey] : null;
+                                    const link = hfKey ? PROJECT_DATA.links.find(l => l.hf === hfKey) : null;
+                                    if (!hfText && !link) return null;
+                                    return (
+                                        <div className="mb-6 bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
+                                            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-indigo-50 flex-wrap gap-2">
+                                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2"><i className="fas fa-scroll text-indigo-500"></i> פרומפט מסירה + קישור חי (גיבוי)</h3>
+                                                <div className="flex items-center gap-2">
+                                                    {link && link.url && <a href={link.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="fas fa-external-link-alt"></i> אתר חי</a>}
+                                                    {hfText && <button onClick={() => copyText(hfText).then(ok => setToast(ok ? 'פרומפט המסירה הועתק — פתח צ\'אט חדש והדבק' : 'נכשל'))} className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="fas fa-copy"></i> העתק פרומפט</button>}
+                                                </div>
+                                            </div>
+                                            {hfText ? (
+                                                <details>
+                                                    <summary className="cursor-pointer px-5 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50">הצג / הסתר את פרומפט המסירה המלא</summary>
+                                                    <pre className="px-5 pb-4 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto font-sans" dir="rtl">{hfText}</pre>
+                                                </details>
+                                            ) : (
+                                                <div className="px-5 py-3 text-xs text-slate-400">אין פרומפט מסירה שמור לפרויקט זה.</div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-10">
                                     <div className="lg:col-span-7 flex flex-col gap-6">
                                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -1210,6 +1382,9 @@
                                         </button>
                                         <button onClick={buildSyncReport} className="bg-white hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm border border-slate-200 text-sm">
                                             <i className="fas fa-clipboard-check text-emerald-500"></i> העתק דו"ח סנכרון לקלוד
+                                        </button>
+                                        <button onClick={() => { setShowBackup(true); setBackupSel(PROJECT_DATA.links[0] || null); }} className="bg-gradient-to-l from-slate-800 to-slate-700 hover:from-slate-900 hover:to-slate-800 text-white font-bold py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md text-sm">
+                                            <i className="fas fa-vault text-amber-400"></i> מרכז גיבוי ומסירה — קישורים ופרומפטים
                                         </button>
                                     </div>
 
