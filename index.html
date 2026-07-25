@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -51,24 +52,42 @@
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration dynamically loaded from environment
-        let firebaseConfig = null;
+        // ─────────────────────────────────────────────────────────────
+        // תצורה: המערכת עובדת עצמאית עם אחסון מקומי (localStorage) כברירת מחדל.
+        // רוצה סנכרון בין מכשירים? הדבק את פרטי ה-Firebase שלך ב-USER_FIREBASE_CONFIG.
+        // (Firebase Console → Project settings → Your apps → SDK setup → Config)
+        // ─────────────────────────────────────────────────────────────
+        const USER_FIREBASE_CONFIG = null; // למשל: { apiKey: "...", authDomain: "...", projectId: "...", ... }
+
+        let firebaseConfig = USER_FIREBASE_CONFIG;
         try {
-            if (typeof __firebase_config !== 'undefined') {
-                firebaseConfig = JSON.parse(__firebase_config);
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config); // תמיכה בסביבת Canvas
             }
         } catch (e) {
             console.error("Error parsing firebase config", e);
         }
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'yomani-app';
+        const cloudMode = !!firebaseConfig;
+
         let app, auth, db;
-        if (firebaseConfig) {
+        if (cloudMode) {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
         }
+
+        // שכבת אחסון מקומי — פועלת כשאין Firebase, כדי שהנתונים ישרדו רענון דף.
+        const LS_PROJECTS = `yomani_projects_${appId}`;
+        const LS_USERS = `yomani_users_${appId}`;
+        const loadLS = (key, fallback) => {
+            try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+            catch (e) { return fallback; }
+        };
+        const saveLS = (key, val) => {
+            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* אחסון מלא / חסום */ }
+        };
 
         class ErrorBoundary extends React.Component {
             constructor(props) {
@@ -132,7 +151,7 @@
             
             const [loggedInUser, setLoggedInUser] = useState(null);
             const [loggedInRole, setLoggedInRole] = useState(null);
-            const [systemUsers, setSystemUsers] = useState({});
+            const [systemUsers, setSystemUsers] = useState(() => cloudMode ? {} : loadLS(LS_USERS, FALLBACK_USERS));
             const [usernameInput, setUsernameInput] = useState('');
             const [passwordInput, setPasswordInput] = useState('');
             const [loginError, setLoginError] = useState('');
@@ -146,7 +165,7 @@
 
             // Initialize Firebase Auth (Rule 3)
             useEffect(() => {
-                if (!auth) return;
+                if (!cloudMode || !auth) return;
                 const initAuth = async () => {
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -168,11 +187,15 @@
 
             // Fetch System Users (Rule 1 & Rule 3)
             useEffect(() => {
+                if (!cloudMode) {
+                    setSystemUsers(loadLS(LS_USERS, FALLBACK_USERS));
+                    return;
+                }
                 if (!dbUser || !db) {
                     setSystemUsers(FALLBACK_USERS);
                     return;
                 }
-                
+
                 const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'systemUsers');
                 const unsubscribe = onSnapshot(usersRef, (snapshot) => {
                     if (snapshot.empty) {
@@ -196,7 +219,12 @@
 
             // Fetch Projects (Rule 1 & Rule 3)
             useEffect(() => {
-                if (!dbUser || !loggedInUser || !db) {
+                if (!loggedInUser) return;
+                if (!cloudMode) {
+                    setProjects(loadLS(LS_PROJECTS, INITIAL_PROJECTS));
+                    return;
+                }
+                if (!dbUser || !db) {
                     setProjects(INITIAL_PROJECTS);
                     return;
                 }
@@ -225,8 +253,17 @@
                 return () => unsubscribe();
             }, [dbUser, loggedInUser]);
 
+            // אחסון מקומי: שמירת כל שינוי במצב הפרויקטים / המשתמשים כשאין ענן.
+            useEffect(() => {
+                if (!cloudMode && loggedInUser) saveLS(LS_PROJECTS, projects);
+            }, [projects, loggedInUser]);
+
+            useEffect(() => {
+                if (!cloudMode) saveLS(LS_USERS, systemUsers);
+            }, [systemUsers]);
+
             const saveProjectToCloud = (proj) => {
-                if (!dbUser || !db) return;
+                if (!cloudMode || !dbUser || !db) return; // מצב מקומי נשמר דרך ה-effect למעלה
                 setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id), proj).catch(console.error);
             };
 
@@ -281,19 +318,23 @@
 
             const handleAddUser = (e) => {
                 e.preventDefault();
-                if(!newUserName.trim() || !newUserPass.trim() || !dbUser || !db) return;
+                if(!newUserName.trim() || !newUserPass.trim()) return;
                 const uname = newUserName.trim().toUpperCase();
-                setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'systemUsers', uname), {
-                    password: newUserPass.trim(),
-                    role: 'user'
-                }).catch(console.error);
+                const data = { password: newUserPass.trim(), role: 'user' };
+                setSystemUsers(prev => ({ ...prev, [uname]: data }));
+                if (cloudMode && dbUser && db) {
+                    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'systemUsers', uname), data).catch(console.error);
+                }
                 setNewUserName('');
                 setNewUserPass('');
             };
 
             const deleteUser = (uname) => {
-                if(uname === 'ADMIN1' || !dbUser || !db) return;
-                deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'systemUsers', uname)).catch(console.error);
+                if(uname === 'ADMIN1') return;
+                setSystemUsers(prev => { const copy = { ...prev }; delete copy[uname]; return copy; });
+                if (cloudMode && dbUser && db) {
+                    deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'systemUsers', uname)).catch(console.error);
+                }
             };
 
             const createNewProject = () => {
@@ -348,13 +389,15 @@
             };
 
             const executeDeleteProject = () => {
-                if (projectToDelete && dbUser && db) {
+                if (!projectToDelete) return;
+                setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+                if (cloudMode && dbUser && db) {
                     deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', projectToDelete.id)).catch(console.error);
-                    if (activeProjectId === projectToDelete.id) {
-                        setActiveProjectId(null);
-                    }
-                    setProjectToDelete(null);
                 }
+                if (activeProjectId === projectToDelete.id) {
+                    setActiveProjectId(null);
+                }
+                setProjectToDelete(null);
             };
 
             const requestDeleteProject = () => {
@@ -373,8 +416,11 @@
             };
 
             const approveDeleteProject = (project) => {
-                if(!dbUser || !db || !project) return;
-                deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', project.id)).catch(console.error);
+                if(!project) return;
+                setProjects(prev => prev.filter(p => p.id !== project.id));
+                if (cloudMode && dbUser && db) {
+                    deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', project.id)).catch(console.error);
+                }
                 if (activeProjectId === project.id) setActiveProjectId(null);
             };
 
@@ -525,13 +571,23 @@
                                 
                                 {loginError && <p className="text-red-500 text-sm text-center font-medium bg-red-50 p-2 rounded-lg">{loginError}</p>}
                                 
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-md mt-4"
                                 >
                                     התחבר למערכת
                                 </button>
                             </form>
+
+                            <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+                                <p className="text-[11px] text-slate-400">
+                                    כניסת מנהל ראשונית: <span className="font-mono font-bold text-slate-500">ADMIN1</span> / <span className="font-mono font-bold text-slate-500">ADMIN111</span>
+                                </p>
+                                <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-center gap-1">
+                                    <i className={`fas ${cloudMode ? 'fa-cloud text-emerald-400' : 'fa-hdd text-slate-400'}`}></i>
+                                    {cloudMode ? 'מסונכרן לענן' : 'הנתונים נשמרים מקומית בדפדפן זה'}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 );
