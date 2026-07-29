@@ -293,6 +293,32 @@
                 { t: `לעדכן README לגרסה הנוכחית (landing-only)`, p: `נמוכה` },
                 { t: `להחליט אם למזג design/expert ל-main`, p: `נמוכה` },
             ]},
+            { sid: 'domains-purchase-todo', project: `🌐 רכישת דומיינים`, chat: `רכישת דומיינים לאתרים על קישור זמני`, tasks: [
+                { t: `לרכוש דומיין ל-VERISESS (כיום verisess.vercel.app)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-k-fitness (כיום k-fitness-pearl.vercel.app)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-hanut-tal-niv (כיום hanut-tal-niv.vercel.app)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-navad / מאפייה (כיום navad-preview.vercel.app)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-windflow-ac (כיום windflow-ac.vercel.app)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ZedTech (כיום aaciyoni-bot.github.io/zedtech-site)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ZedSolar (כיום aaciyoni-bot.github.io/zedsolar-site)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ZedHome (כיום aaciyoni-bot.github.io/zedhome-site)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ZedBaby (כיום aaciyoni-bot.github.io/zedbaby-site)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ZedCards (כיום aaciyoni-bot.github.io/zedcards-site)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ZedTickets (כיום aaciyoni-bot.github.io/zedtickets-site)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ORIZIS Academy (כיום aaciyoni-bot.github.io/orizis-academy)`, p: `גבוהה` },
+                { t: `לרכוש דומיין ל-ZedMatch (כיום aaciyoni-bot.github.io/zedmatch-site)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-royal777 (כיום royal777-yoni-s-projects3k.vercel.app)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-adlipa (כיום adlipa.web.app)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-ASFANUT (כיום aaciyoni-bot.github.io/ASFANUT)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-yehonatan-realestate (כיום aaciyoni-bot.github.io/yehonatan-realestate)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-SWIPEJOB / GOOJOB (כיום aaciyoni-bot.github.io/SWIPEJOB)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-uziel / BidMaster (כיום aaciyoni-bot.github.io/uziel)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-SCRATCH / DIAMOND BALL (כיום aaciyoni-bot.github.io/SCRATCH)`, p: `בינונית` },
+                { t: `לרכוש דומיין ל-CHASIDOOT (כיום aaciyoni-bot.github.io/CHASIDOOT)`, p: `נמוכה` },
+                { t: `לרכוש דומיין ל-ORIZJOREAL (כיום aaciyoni-bot.github.io/ORIZJOREAL)`, p: `נמוכה` },
+                { t: `לרכוש דומיין ל-awakingdreams (כיום aaciyoni-bot.github.io/awakingdreams)`, p: `נמוכה` },
+                { t: `לרכוש דומיין ל-YOMANI (כיום aaciyoni-bot.github.io/YOMANI)`, p: `נמוכה` },
+            ]},
         ];
 
         // נתוני הגיבוי שנטענו מ-handoffs.js (קישורים חיים + פרומפטי מסירה לכל פרויקט)
@@ -759,6 +785,10 @@
                         });
                         const openCount = proj.tasks.filter(t => !t.isDone).length;
                         proj.status = openCount === 0 ? 'הושלם' : 'בעבודה';
+                        const hk = SID_TO_HANDOFF[entry.sid];
+                        const lk = hk ? PROJECT_DATA.links.find(l => l.hf === hk) : null;
+                        proj.liveUrl = lk ? lk.url : (proj.liveUrl || '');
+                        proj.liveStatus = lk ? lk.status : (proj.liveStatus || '');
                         changedPids.add(pid);
                     });
                     const merged = Array.from(byId.values());
@@ -1396,7 +1426,7 @@
                                         <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4"><i className="fas fa-check-circle text-blue-500"></i> לביצוע</h3>
                                         
                                         <div className="space-y-3">
-                                            {visibleProjects.flatMap(p => (Array.isArray(p?.tasks) ? p.tasks : []).filter(t => !t.isDone).map(t => ({...t, projectName: p.name, projectId: p.id})))
+                                            {visibleProjects.flatMap(p => (Array.isArray(p?.tasks) ? p.tasks : []).filter(t => !t.isDone).map(t => ({...t, projectName: p.name, projectId: p.id, projectLive: p.liveUrl, projectStatus: p.liveStatus})))
                                                 .sort((a, b) => {
                                                     const pa = PRIORITY_ORDER[a.claudePriority] ?? 1;
                                                     const pb = PRIORITY_ORDER[b.claudePriority] ?? 1;
@@ -1415,6 +1445,9 @@
                                                                     <button onClick={() => setActiveProjectId(task.projectId)} className="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-bold transition-colors border border-blue-200 flex items-center gap-1"><i className="fas fa-folder"></i>{task.projectName}</button>
                                                                     {task.claudePriority && (
                                                                         <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold border ${getPriorityColor(task.claudePriority)}`}>{task.claudePriority}</span>
+                                                                    )}
+                                                                    {task.projectLive && (
+                                                                        <a href={/^H/.test(task.projectStatus || '') ? task.projectLive.replace(/^https:/, 'http:') : task.projectLive} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-[11px] px-2.5 py-1 rounded-full font-bold border bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 flex items-center gap-1" dir="ltr" title="האתר החי של הפרויקט"><i className="fas fa-globe text-slate-400"></i>{task.projectLive.replace(/^https?:\/\//, '').replace(/\/$/, '')}</a>
                                                                     )}
                                                                 </div>
                                                             </div>
