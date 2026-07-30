@@ -164,4 +164,17 @@ window.CLAUDE_IMPORT_DATA = [
                 { t: `לרכוש דומיין ל-awakingdreams (כיום aaciyoni-bot.github.io/awakingdreams)`, p: `נמוכה` },
                 { t: `לרכוש דומיין ל-YOMANI (כיום aaciyoni-bot.github.io/YOMANI)`, p: `נמוכה` },
             ]},
+            { sid: 'cj-automation-todo', project: `🚚 CJ + תשלום אוטומטי לחנויות (חובה)`, chat: `אוטומציית מילוי CJ Dropshipping + גביית pawaPay ל-6 חנויות המוצרים`, tasks: [
+                { t: `לפרוס שכבת תשלום אוטומטי (pawaPay) לחנויות — לקוח משלם MoMo → נגבה אוטומטית (משותף עם AdLipa)`, p: `גבוהה` },
+                { t: `לספק אימייל חשבון CJ + לסובב את מפתח ה-API של CJ שנחשף בצ'אט`, p: `גבוהה` },
+                { t: `לפרוס את cj-backend ל-Vercel + env (CJ_EMAIL / CJ_API_KEY / INTERNAL_SECRET / MARKUP=30)`, p: `גבוהה` },
+                { t: `פיילוט Chipazi: להעביר קטלוג למשיכה מ-CJ (pid/vid) + לחווט checkout→הזמנה, לבדוק end-to-end`, p: `גבוהה` },
+                { t: `לשכפל את חיבור CJ ל-5 החנויות הנותרות (ZedHome/ZedBaby/ZedSolar/ZedGlow/ZedMall)`, p: `בינונית` },
+            ]},
+            { sid: 'adlipa-automation-todo', project: `📣 AdLipa — אוטומציה (חובה)`, chat: `אוטומציית תשלום (pawaPay) + הרצת קמפיין ל-AdLipa`, tasks: [
+                { t: `לפרוס את backend של AdLipa (pawaPay) + PAWAPAY_TOKEN → גבייה אוטומטית במקום קונסיירז' ידני`, p: `גבוהה` },
+                { t: `לכבות Deployment Protection ב-Vercel ולהעביר את adlipa.com ל-Vercel (A→76.76.21.21)`, p: `גבוהה` },
+                { t: `להוסיף adlipa.com + הדומיין החדש של Vercel ל-Authorized Domains ב-Firebase Auth (אחרת Google login נשבר)`, p: `גבוהה` },
+                { t: `Phase 2: אוטומציית הרצת קמפיין — חיבור ל-Meta/TikTok Ads API + אימות עסקי + app-review`, p: `בינונית` },
+            ]},
         ];
