@@ -626,6 +626,7 @@
                         const lk = hk ? PROJECT_DATA.links.find(l => l.hf === hk) : null;
                         proj.liveUrl = lk ? lk.url : (proj.liveUrl || '');
                         proj.liveStatus = lk ? lk.status : (proj.liveStatus || '');
+                        proj.pinned = !!entry.pinned;
                         changedPids.add(pid);
                     });
                     const merged = Array.from(byId.values());
@@ -1258,6 +1259,38 @@
                                             <i className="fas fa-vault text-amber-400"></i> מרכז גיבוי ומסירה — קישורים ופרומפטים
                                         </button>
                                     </div>
+
+                                    {(() => {
+                                        const pinned = visibleProjects.filter(p => p && p.pinned)
+                                            .flatMap(p => (Array.isArray(p.tasks) ? p.tasks : []).filter(t => !t.isDone).map(t => ({ ...t, projectName: p.name, projectId: p.id })))
+                                            .sort((a, b) => (PRIORITY_ORDER[a.claudePriority] ?? 1) - (PRIORITY_ORDER[b.claudePriority] ?? 1));
+                                        if (!pinned.length) return null;
+                                        return (
+                                            <div className="mb-8 bg-gradient-to-l from-amber-50 via-white to-rose-50 border-2 border-amber-300 rounded-3xl shadow-md p-6 md:p-7">
+                                                <div className="flex items-center gap-2 mb-5 pb-3 border-b border-amber-200">
+                                                    <span className="text-2xl">📌</span>
+                                                    <h3 className="text-lg font-extrabold text-amber-900">משימות חובה</h3>
+                                                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200">{pinned.length}</span>
+                                                </div>
+                                                <div className="space-y-2.5">
+                                                    {pinned.map(task => (
+                                                        <div key={task.id} className="flex items-center justify-between group bg-white p-3.5 rounded-2xl transition-all border border-amber-100 shadow-sm hover:shadow-md">
+                                                            <div className="flex items-start gap-3">
+                                                                <button onClick={() => toggleTask(task.projectId, task.id)} className="text-amber-300 hover:text-green-500 focus:outline-none transition-colors mt-0.5"><i className="far fa-circle text-xl"></i></button>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-bold text-slate-800 mb-1">{task.text}</span>
+                                                                    <div className="flex items-center flex-wrap gap-2">
+                                                                        <button onClick={() => setActiveProjectId(task.projectId)} className="text-[11px] bg-amber-100 hover:bg-amber-200 text-amber-800 px-2.5 py-1 rounded-full font-bold border border-amber-200 flex items-center gap-1"><i className="fas fa-folder"></i>{task.projectName}</button>
+                                                                        {task.claudePriority && <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold border ${getPriorityColor(task.claudePriority)}`}>{task.claudePriority}</span>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
 
                                     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8">
                                         <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4"><i className="fas fa-check-circle text-blue-500"></i> לביצוע</h3>
